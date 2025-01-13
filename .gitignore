@@ -1,0 +1,8 @@
+exefs
+romfs
+**/dist
+**/build
+**/*.log
+**/*.tgz
+.vscode/**
+**/node_modules
