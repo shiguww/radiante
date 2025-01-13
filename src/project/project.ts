@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import { CTRT } from "#ctrt/ctrt";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import * as nwtex from "#nw-texture/nw-texture";
@@ -19,9 +20,9 @@ import {
   DARC,
   CTRVFS,
   readROM,
+  CTRROMListener,
   CTREventEmitter,
-  CTREventEmitterDefaultEventMap,
-  CTRROMListener
+  CTREventEmitterDefaultEventMap
 } from "libctr";
 
 interface RadianteProjectFileInfo {
@@ -62,6 +63,7 @@ class RadianteProject extends CTREventEmitter<
   public static readonly LOCALE_DIRECTORY = "locale";
   public static readonly SHADER_DIRECTORY = "shader";
   public static readonly SCRIPT_DIRECTORY = "script";
+  public static readonly GRAPHIC_DIRECTORY = "graphic";
   public static readonly RADIANTE_DIRECTORY = ".radiante";
 
   private _root: CTRVFS;
@@ -237,6 +239,26 @@ class RadianteProject extends CTREventEmitter<
     return true;
   }
 
+  private async _createCTRT(
+    directory: string,
+    node: CTRVFSNode,
+    name?: string
+  ): Promise<boolean> {
+    if (node.isDirectory() || node.extname !== "") {
+      this.emit("create.romfs.node.unexpected", node);
+      return false;
+    }
+
+    try {
+      node.data = new CTRT().parse(node.data).toPNG({ write: true });
+      await this._createFile(directory, node, name);
+    } catch {
+      await this._createFile(directory, node, name?.replace(/\.png$/, ""));
+    }
+
+    return true;
+  }
+
   private async _createFile(
     directory: string,
     file: CTRVFSFile,
@@ -328,6 +350,22 @@ class RadianteProject extends CTREventEmitter<
     }
 
     await this._createFile(directory, node, name);
+    return true;
+  }
+
+  private async _createBCREZ(
+    directory: string,
+    node: CTRVFSNode,
+    name?: string
+  ): Promise<boolean> {
+    if (node.isDirectory() || node.extname !== ".bcrez") {
+      this.emit("create.romfs.node.unexpected", node);
+      return false;
+    }
+
+    this._decodeBLZ(node);
+    await this._createFile(directory, node, name || `${node.stemname}.bcres`);
+
     return true;
   }
 
@@ -441,6 +479,11 @@ class RadianteProject extends CTREventEmitter<
         continue;
       }
 
+      if (node.name === "Graphics") {
+        await this._processGraphics(node);
+        continue;
+      }
+
       if (node.name === "NWTexture") {
         await this._processNWTextures(node);
         continue;
@@ -543,6 +586,63 @@ class RadianteProject extends CTREventEmitter<
     if (await this._createBCSDR(RadianteProject.SHADER_DIRECTORY, node)) {
       this.emit("create.romfs.node.process.end", node);
     }
+  }
+
+  private async _processSounds(node: CTRVFSNode): Promise<void> {
+    this.emit("create.romfs.node.process.start", node);
+
+    if (node.isFile() || node.name !== "sound") {
+      return void this.emit("create.romfs.node.unexpected", node);
+    }
+
+    for (const child of node.nodes) {
+      if (child.name === "554g_sound.csid") {
+        if (
+          await this._createCSID(
+            this._resolve(RadianteProject.SOUND_DIRECTORY),
+            node,
+            "sound.csid"
+          )
+        ) {
+          this.emit("create.romfs.node.process.end", child);
+        }
+
+        continue;
+      }
+
+      if (child.name === "554G_sound.bcsar") {
+        if (
+          await this._createBCSAR(
+            this._resolve(RadianteProject.SOUND_DIRECTORY),
+            node,
+            "sound.bcsar"
+          )
+        ) {
+          this.emit("create.romfs.node.process.end", child);
+        }
+
+        continue;
+      }
+
+      if (child.isDirectory() && child.name === "stream") {
+        for (const node of child.nodes) {
+          this.emit("create.romfs.node.process.start", node);
+
+          if (
+            await this._createBCSTM(
+              this._resolve(RadianteProject.SOUND_DIRECTORY),
+              node
+            )
+          ) {
+            this.emit("create.romfs.node.process.end", node);
+          }
+        }
+      }
+
+      continue;
+    }
+
+    this.emit("create.romfs.node.process.end", node);
   }
 
   private async _processScript(
@@ -650,6 +750,39 @@ class RadianteProject extends CTREventEmitter<
     this.emit("create.romfs.node.process.end", node);
   }
 
+  private async _processGraphic(
+    directory: string,
+    node: CTRVFSNode
+  ): Promise<void> {
+    this.emit("create.romfs.node.process.start", node);
+
+    if (node.isFile()) {
+      if (node.extname === "" && (await this._createCTRT(directory, node))) {
+        return void this.emit("create.romfs.node.process.end", node);
+      }
+
+      if (
+        node.extname === ".bcrez" &&
+        (await this._createBCREZ(directory, node))
+      ) {
+        return void this.emit("create.romfs.node.process.end", node);
+      }
+
+      return void this.emit("create.romfs.node.unexpected", node);
+    }
+
+    for (const child of node.nodes) {
+      await this._processGraphic(
+        child.isDirectory()
+          ? path.resolve(directory, child.name.toLowerCase())
+          : directory,
+        child
+      );
+    }
+
+    this.emit("create.romfs.node.process.end", node);
+  }
+
   private async _processScripts(node: CTRVFSNode): Promise<void> {
     this.emit("create.romfs.node.process.start", node);
 
@@ -667,58 +800,18 @@ class RadianteProject extends CTREventEmitter<
     this.emit("create.romfs.node.process.end", node);
   }
 
-  private async _processSounds(node: CTRVFSNode): Promise<void> {
+  private async _processGraphics(node: CTRVFSNode): Promise<void> {
     this.emit("create.romfs.node.process.start", node);
 
-    if (node.isFile() || node.name !== "sound") {
+    if (node.isFile() || node.name !== "Graphics") {
       return void this.emit("create.romfs.node.unexpected", node);
     }
 
     for (const child of node.nodes) {
-      if (child.name === "554g_sound.csid") {
-        if (
-          await this._createCSID(
-            this._resolve(RadianteProject.SOUND_DIRECTORY),
-            node,
-            "sound.csid"
-          )
-        ) {
-          this.emit("create.romfs.node.process.end", child);
-        }
-
-        continue;
-      }
-
-      if (child.name === "554G_sound.bcsar") {
-        if (
-          await this._createBCSAR(
-            this._resolve(RadianteProject.SOUND_DIRECTORY),
-            node,
-            "sound.bcsar"
-          )
-        ) {
-          this.emit("create.romfs.node.process.end", child);
-        }
-
-        continue;
-      }
-
-      if (child.isDirectory() && child.name === "stream") {
-        for (const node of child.nodes) {
-          this.emit("create.romfs.node.process.start", node);
-
-          if (
-            await this._createBCSTM(
-              this._resolve(RadianteProject.SOUND_DIRECTORY),
-              node
-            )
-          ) {
-            this.emit("create.romfs.node.process.end", node);
-          }
-        }
-      }
-
-      continue;
+      await this._processGraphic(
+        this._resolve(RadianteProject.GRAPHIC_DIRECTORY),
+        child
+      );
     }
 
     this.emit("create.romfs.node.process.end", node);
