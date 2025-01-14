@@ -659,6 +659,8 @@ class RadianteProject extends CTREventEmitter<
       return;
     }
 
+    directory = path.resolve(directory, node.name.toLowerCase());
+    
     for (const child of node.nodes) {
       await this._processScript(
         child.isDirectory()
@@ -770,6 +772,8 @@ class RadianteProject extends CTREventEmitter<
 
       return void this.emit("create.romfs.node.unexpected", node);
     }
+
+    directory = path.resolve(directory, node.name.toLowerCase());
 
     for (const child of node.nodes) {
       await this._processGraphic(
