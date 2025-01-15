@@ -1,37 +1,44 @@
 import { CTRMemory } from "libctr";
 import type { CTRMemoryArray } from "libctr";
 import { KDMEntity } from "#kdm/common/kdm-entity";
+import { RadianteKDMStringPointer } from "#kdm/common/primitive/kdm-string-pointer";
 
 import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
 
+type RadianteKDMStructConstructor<
+  T extends RadianteKDMStructDefinition = RadianteKDMStructDefinition
+> = new () => RadianteKDMStruct<string, T>;
+
 interface RadianteKDMStructDefinition extends Array<[string, KDMEntity<any>]> {}
 
-type RadianteKDMStructObject<
-  N extends string,
-  T extends RadianteKDMStructDefinition
-> = {
-  [K in T[number] as K[0]]: K[1] extends KDMEntity<infer S> ? S : never;
-} & Record<"entity", N>;
+type RadianteKDMStructObject<S extends RadianteKDMStruct = RadianteKDMStruct> =
+  S extends RadianteKDMStruct<infer N, infer T>
+    ? {
+        [K in T[number] as K[0]]: K[1] extends KDMEntity<infer S> ? S : never;
+      } & Record<"entity", N>
+    : never;
 
 abstract class RadianteKDMStruct<
   N extends string = string,
   T extends RadianteKDMStructDefinition = RadianteKDMStructDefinition
-> extends KDMEntity<RadianteKDMStructObject<N, T>> {
-  protected _struct: T;
+> extends KDMEntity<RadianteKDMStructObject<RadianteKDMStruct<N, T>>> {
+  protected _definition: T;
   private readonly _name: N;
 
   protected constructor(
     name: N,
-    struct: T,
-    stateOrBuffer?: CTRMemoryArray | RadianteKDMStructObject<N, T>
+    definition: T,
+    stateOrBuffer?:
+      | CTRMemoryArray
+      | RadianteKDMStructObject<RadianteKDMStruct<N, T>>
   ) {
     super();
 
     this._name = name;
-    this._struct = struct;
+    this._definition = definition;
 
     if (CTRMemory.isSource(stateOrBuffer)) {
       this.parse(stateOrBuffer);
@@ -41,14 +48,14 @@ abstract class RadianteKDMStruct<
   }
 
   public get fields(): T[number][1][] {
-    return this._struct.map(([, field]) => field);
+    return this._definition.map(([, field]) => field);
   }
 
-  protected override _get(): RadianteKDMStructObject<N, T> {
+  public get struct(): RadianteKDMStructObject<RadianteKDMStruct<N, T>> {
     return Object.assign(
       Object.create(null),
       Object.fromEntries(
-        this._struct.map(([key, field]) => [key, field.get()])
+        this._definition.map(([key, field]) => [key, field.get()])
       ),
       {
         entity: this._name
@@ -56,8 +63,18 @@ abstract class RadianteKDMStruct<
     );
   }
 
-  protected override _set(state: RadianteKDMStructObject<N, T>): void {
-    for (const [key, field] of this._struct) {
+  public override get strings(): RadianteKDMStringPointer[] {
+    return this.fields.filter((f) => f instanceof RadianteKDMStringPointer);
+  }
+
+  protected override _get(): RadianteKDMStructObject<RadianteKDMStruct<N, T>> {
+    return this.struct;
+  }
+
+  protected override _set(
+    state: RadianteKDMStructObject<RadianteKDMStruct<N, T>>
+  ): void {
+    for (const [key, field] of this._definition) {
       field.set(Reflect.get(state, key));
     }
   }
@@ -87,7 +104,7 @@ abstract class RadianteKDMStruct<
       return new Error("kdm.err_invalid_state");
     }
 
-    for (const [key, field] of this._struct) {
+    for (const [key, field] of this._definition) {
       const value = Reflect.get(state, key);
       const err = field.validate(value);
 
@@ -106,5 +123,7 @@ export type {
   RadianteKDMStructObject,
   RadianteKDMStructObject as KDMStructObject,
   RadianteKDMStructDefinition,
-  RadianteKDMStructDefinition as KDMStructDefinition
+  RadianteKDMStructDefinition as KDMStructDefinition,
+  RadianteKDMStructConstructor,
+  RadianteKDMStructConstructor as KDMStructConstructor
 };

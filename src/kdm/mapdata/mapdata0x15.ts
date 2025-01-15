@@ -26,7 +26,7 @@ type RadianteKDMMapData0x15Definition = [
 ];
 
 interface IRadianteKDMMapData0x15
-  extends RadianteKDMStructObject<"MapData0x15", RadianteKDMMapData0x15Definition> {}
+  extends RadianteKDMStructObject<RadianteKDMMapData0x15> {}
 
 class RadianteKDMMapData0x15 extends RadianteKDMStruct<
   "MapData0x15",
