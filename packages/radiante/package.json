@@ -23,7 +23,8 @@
   },
   "name": "radiante",
   "scripts": {
-    "prepublish": "pnpm build",
+    "radiante": "tsx index.ts",
+    "prepublish": "rollup -c",
     "build": "rollup -c && pkg build/radiante.js -o build/radiante -t latest-linux,latest-windows"
   },
   "type": "module",
