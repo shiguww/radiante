@@ -1,22 +1,43 @@
 import path from "node:path";
 import winston from "winston";
 import fs from "node:fs/promises";
+import { homedir } from "node:os";
 import process from "node:process";
 import { Command } from "commander";
 import { promisify } from "node:util";
-import { RadianteProject } from "radiante";
+import { join, resolve } from "node:path";
+import { env, platform } from "node:process";
 import { existsSync as exists } from "node:fs";
+import { RadianteProject } from "@radiante/core";
 import { input, confirm } from "@inquirer/prompts";
 
-import {
-  RADIANTE_COMMIT,
-  RADIANTE_ROLLUP,
-  RADIANTE_VERSION,
-  RADIANTE_DIRECTORY,
-  RADIANTE_LOG_DIRECTORY,
-  RADIANTE_BUILD_DATETIME,
-  RADIANTE_TEMPORARY_DIRECTORY
-} from "#constants";
+declare const _RADIANTE_ROLLUP: true | undefined;
+declare const _RADIANTE_COMMIT: null | string | undefined;
+declare const _RADIANTE_VERSION: null | string | undefined;
+declare const _RADIANTE_BUILD_DATETIME: string | undefined;
+
+const _RADIANTE_DIRECTORY =
+  platform === "win32"
+    ? resolve(
+        env.LOCALAPPDATA || join(homedir(), "AppData", "Local"),
+        "radiante"
+      )
+    : resolve(homedir(), ".radiante");
+
+const RADIANTE_LOG_DIRECTORY = resolve(_RADIANTE_DIRECTORY, "log");
+
+const RADIANTE_ROLLUP = typeof _RADIANTE_ROLLUP !== "undefined";
+
+const RADIANTE_COMMIT =
+  typeof _RADIANTE_COMMIT !== "undefined" ? _RADIANTE_COMMIT : null;
+
+const RADIANTE_VERSION =
+  typeof _RADIANTE_VERSION !== "undefined" ? _RADIANTE_VERSION : null;
+
+const RADIANTE_BUILD_DATETIME =
+  typeof _RADIANTE_BUILD_DATETIME !== "undefined"
+    ? _RADIANTE_BUILD_DATETIME
+    : new Date().toISOString();
 
 interface RadianteCommandOptions extends Record<string, unknown> {}
 
@@ -83,9 +104,8 @@ async function main(): Promise<void> {
 
 async function _main(): Promise<void> {
   //#region
-  await fs.mkdir(RADIANTE_DIRECTORY, { recursive: true });
+  await fs.mkdir(_RADIANTE_DIRECTORY, { recursive: true });
   await fs.mkdir(RADIANTE_LOG_DIRECTORY, { recursive: true });
-  await fs.mkdir(RADIANTE_TEMPORARY_DIRECTORY, { recursive: true });
   //#endregion
 
   await program.parseAsync(process.argv);
@@ -150,7 +170,7 @@ async function createCommand(options: RadianteCommandOptions): Promise<void> {
 async function exit(code: number): Promise<never> {
   await promisify(process.stdout.write.bind(process.stdout))("");
   await promisify(process.stderr.write.bind(process.stderr))("");
-  await promisify(logger.end)();
+  await promisify(logger.end.bind(logger))();
 
   process.exit(code);
 }

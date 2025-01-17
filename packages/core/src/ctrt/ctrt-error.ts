@@ -16,7 +16,7 @@ interface RadianteCTRTErrorMetadata {
   type?: number | string;
 }
 
-abstract class RadianteCTRTError<
+class RadianteCTRTError<
   C extends RadianteCTRTErrorCode = RadianteCTRTErrorCode,
   M extends RadianteCTRTErrorMetadata = RadianteCTRTErrorMetadata
 > extends CTRError<C, M> {

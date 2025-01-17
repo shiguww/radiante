@@ -1,57 +1,7 @@
 {
-  "bin": "dist/cli.cjs",
-  "dependencies": {
-    "libctr": "^2.1.0",
-    "pngjs": "^7.0.0"
-  },
   "devDependencies": {
-    "@inquirer/prompts": "^7.2.3",
-    "@libctr/tsconfig": "^0.0.0",
-    "@rollup/plugin-commonjs": "^28.0.2",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.0",
-    "@rollup/plugin-replace": "^6.0.2",
-    "@rollup/plugin-typescript": "^12.1.2",
-    "@types/node": "^22.10.6",
-    "@types/pngjs": "^6.0.5",
-    "commander": "^13.0.0",
-    "pkg": "^5.8.1",
-    "prettier": "^3.4.2",
-    "rollup": "^4.30.1",
-    "tslib": "^2.8.1",
-    "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
-    "winston": "^3.17.0"
+    "prettier": "^3.4.2"
   },
-  "exports": {
-    ".": {
-      "import": "./dist/npm/index.js",
-      "types": "./dist/npm/index.d.ts",
-      "require": "./dist/npm/index.cjs"
-    }
-  },
-  "files": [
-    "dist/npm/cli.cjs",
-    "dist/npm/index.js",
-    "dist/npm/index.cjs",
-    "dist/npm/index.d.ts"
-  ],
-  "license": "MPL-2.0",
-  "name": "radiante",
-  "packageManager": "pnpm@9.15.4",
-  "scripts": {
-    "build:rollup": "rollup -c",
-    "format": "prettier --write .",
-    "build": "bash scripts/build.sh",
-    "prepublish": "pnpm release:full",
-    "release": "bash scripts/release.sh",
-    "release:full": "FULL_RELEASE=y pnpm release",
-    "radiante": "pnpm build:npm && tsx src/cli/main.ts",
-    "build:exe": "pnpm build:npm && pkg build/radiante.cjs -o build/radiante -t latest-linux,latest-windows",
-    "build:npm": "mkdir -p dist/npm/ && tsup src/index.ts --dts --format cjs,esm --outDir dist/npm && pnpm build:rollup && cp build/cli.cjs dist/npm/cli.cjs"
-  },
-  "type": "module",
-  "version": "0.0.0"
+  "private": true,
+  "packageManager": "pnpm@9.15.4"
 }

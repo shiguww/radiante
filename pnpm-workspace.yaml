@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+
+catalog:
+  "tsx": ^4.19.2
+  "tsup": ^8.3.5
+  "vitest": ^2.1.8
+  "typescript": ^5.7.2
+  "@types/node": ^22.10.5
+  "@libctr/tsconfig": ^0.0.0
