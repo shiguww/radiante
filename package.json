@@ -1,7 +1,7 @@
 {
   "bin": "dist/cli.cjs",
   "dependencies": {
-    "libctr": "^2.0.2",
+    "libctr": "^2.1.0",
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
