@@ -1,5 +1,6 @@
 import { CTRMemory } from "libctr";
 import { KDMEntity } from "#kdm/common/kdm-entity";
+import { RadianteKDMInvalidPointerError } from "#kdm/kdm-error";
 
 import type {
   RadianteKDMBuildContext,
@@ -22,11 +23,14 @@ abstract class RadianteKDMPointer<S = unknown> extends KDMEntity<S> {
     const offset = ctx.pointers.get(this);
 
     if (offset === undefined) {
-      throw "kdm.err_unknown_pointer";
+      throw new RadianteKDMInvalidPointerError({
+        pointer: this,
+        instance: ctx.instance
+      });
     }
 
     this._resolve(ctx);
-    buffer.at(offset, (buffer) => buffer.u32(this._pointer))
+    buffer.at(offset, (buffer) => buffer.u32(this._pointer));
 
     return this;
   }

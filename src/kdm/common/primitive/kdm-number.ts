@@ -1,6 +1,7 @@
 import { CTRMemory } from "libctr";
 import type { CTRMemoryDataType } from "libctr";
 import { RadianteKDMEntity } from "#kdm/common/kdm-entity";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 type RadianteKDMNumberType = CTRMemoryDataType &
   `${"i" | "u" | "f"}${"8" | "16" | "32"}`;
@@ -40,17 +41,19 @@ abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
     return CTRMemory.sizeof(this.type);
   }
 
-  protected override _validate(number: unknown): null | Error {
-    if (typeof number !== "number") {
-      return new Error("kdm.err_invalid_state");
+  protected override _validate(state: unknown): null | Error {
+    const input = state;
+
+    if (typeof input !== "number") {
+      return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
-    if (number > CTRMemory.max(this.type)) {
-      return new Error("kdm.err_overflow");
+    if (input > CTRMemory.max(this.type)) {
+      return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
-    if (number < CTRMemory.min(this.type)) {
-      return new Error("kdm.err_underflow");
+    if (input < CTRMemory.min(this.type)) {
+      return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
     return null;

@@ -1,3 +1,5 @@
+import { NWTextureError } from "#nw-texture/nw-texture-error";
+
 import {
   blz,
   CTRVFS,
@@ -18,8 +20,14 @@ type RadianteNWTextureVFSFileAttributes = {
 };
 
 type RadianteNWTextureVFS = CTRVFS<{}, RadianteNWTextureVFSFileAttributes>;
-type RadianteNWTextureVFSNode = CTRVFSNode<{}, RadianteNWTextureVFSFileAttributes>;
-type RadianteNWTextureVFSFile = CTRVFSFile<{}, RadianteNWTextureVFSFileAttributes>;
+type RadianteNWTextureVFSNode = CTRVFSNode<
+  {},
+  RadianteNWTextureVFSFileAttributes
+>;
+type RadianteNWTextureVFSFile = CTRVFSFile<
+  {},
+  RadianteNWTextureVFSFileAttributes
+>;
 
 type RadianteNWTextureVFSDirectory = CTRVFSDirectory<
   {},
@@ -83,11 +91,17 @@ function _decode(
 
   for (const item of items) {
     if (data.offset !== item.dataOffset) {
-      throw "nwtexture::malformed_data";
+      throw new NWTextureError(NWTextureError.ERR_MALFORMED_DATA, {
+        data,
+        info
+      });
     }
 
     if (info.offset !== nameStart + item.nameOffset) {
-      throw "nwtexture::malformed_info";
+      throw new NWTextureError(NWTextureError.ERR_MALFORMED_INFO, {
+        data,
+        info
+      });
     }
 
     const file = root.file(

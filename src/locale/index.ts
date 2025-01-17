@@ -18,3 +18,16 @@ export {
   normalizeLocale as normalize,
   normalizeLocaleCode as normalizeCode
 } from "#locale/locale";
+
+export {
+  RadianteLocaleError as Error,
+  RadianteInvalidLocaleError as InvalidLocaleError,
+  RadianteInvalidLocaleCodeError as InvalidLocaleCodeError
+} from "#locale/locale-error";
+
+export type {
+  RadianteLocaleErrorCode as ErrorCode,
+  RadianteLocaleErrorMetadata as ErrorMetadata,
+  RadianteInvalidLocaleErrorMetadata as InvalidLocaleErrorMetadata,
+  RadianteInvalidLocaleCodeErrorMetadata as InvalidLocaleCodeErrorMetadata
+} from "#locale/locale-error";

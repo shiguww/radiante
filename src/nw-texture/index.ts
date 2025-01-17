@@ -8,3 +8,6 @@ export type {
   RadianteNWTextureVFSDirectory as VFSDirectory,
   RadianteNWTextureVFSFileAttributes as VFSFileAttributes
 } from "#nw-texture/nw-texture";
+
+export { RadianteNWTextureError as Error } from "#nw-texture/nw-texture-error";
+export type { RadianteNWTextureErrorCode as ErrorCode } from "#nw-texture/nw-texture-error";

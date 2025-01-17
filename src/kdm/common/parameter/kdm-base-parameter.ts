@@ -6,6 +6,7 @@ import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 interface IRadianteKDMBaseParameter<T, N extends string> {
   value: T;
@@ -43,20 +44,27 @@ abstract class RadianteKDMBaseParameter<
     this.value.set(state.value);
   }
 
-  protected override _validate(parameter: unknown): null | Error {
-    if (parameter === null || typeof parameter !== "object") {
-      return new Error("kdm.err_invalid_state");
+  protected override _validate(state: unknown): null | Error {
+    const input = state;
+
+    if (input === null || typeof input !== "object") {
+      return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
-    if (this.name.validate(Reflect.get(parameter, "name"))) {
-      return new Error("kdm.err_invalid_state");
+    let err: null | RadianteKDMInvalidStateError;
+    err = this.name._validateAt(input, "name");
+
+    if (err !== null) {
+      return err;
     }
 
-    if (this.value.validate(Reflect.get(parameter, "value"))) {
-      return new Error("kdm.err_invalid_state");
+    err = this.value._validateAt(input, "value");
+
+    if (err !== null) {
+      return err;
     }
 
-    return new Error("kdm.err_invalid_state");
+    return null;
   }
 
   protected override _build(

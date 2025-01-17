@@ -4,6 +4,7 @@ import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 class RadianteKDMStringPointer extends RadianteKDMPointer<string> {
   public string: string;
@@ -30,9 +31,13 @@ class RadianteKDMStringPointer extends RadianteKDMPointer<string> {
     this._pointer = ctx.instance.strings.get(this.string) || 0;
   }
 
-  protected override _validate(string: unknown): null | Error {
-    if (typeof string !== "string") {
-      return new Error("kdm.err_invalid_state");
+  protected override _validate(state: unknown): null | Error {
+    if (typeof state !== "string") {
+      return new RadianteKDMInvalidStateError({
+        state,
+        path: [],
+        input: state
+      });
     }
 
     return null;

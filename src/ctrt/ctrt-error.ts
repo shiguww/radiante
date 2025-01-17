@@ -16,20 +16,10 @@ interface RadianteCTRTErrorMetadata {
   type?: number | string;
 }
 
-class RadianteCTRTError<
+abstract class RadianteCTRTError<
   C extends RadianteCTRTErrorCode = RadianteCTRTErrorCode,
   M extends RadianteCTRTErrorMetadata = RadianteCTRTErrorMetadata
 > extends CTRError<C, M> {
-  public static is<C extends RadianteCTRTErrorCode>(
-    value: unknown,
-    code?: C
-  ): value is RadianteCTRTError<C> {
-    return (
-      value instanceof RadianteCTRTError &&
-      (code === undefined || value.code === code)
-    );
-  }
-
   public static readonly ERR_UNKNOWN = "ctrt::err_unknown";
   public static readonly ERR_INVALID_HEADER = "ctrt::err_invalid_header";
   public static readonly ERR_NOT_A_CTRT_FILE = "ctrt::err_not_a_ctrt_file";
@@ -45,7 +35,17 @@ interface RadianteCTRTFormatErrorMetadata
 
 class RadianteCTRTFormatError<
   C extends RadianteCTRTErrorCode
-> extends RadianteCTRTError<C, RadianteCTRTFormatErrorMetadata> {}
+> extends RadianteCTRTError<C, RadianteCTRTFormatErrorMetadata> {
+  public static is<C extends RadianteCTRTErrorCode>(
+    err: unknown,
+    code?: C
+  ): err is RadianteCTRTFormatError<C> {
+    return (
+      err instanceof RadianteCTRTFormatError &&
+      (code === undefined || err.code === code)
+    );
+  }
+}
 
 interface RadianteCTRTUnrecognizedTypeErrorMetadata
   extends Pick<RadianteCTRTErrorMetadata, "type" | "texture"> {}
@@ -54,6 +54,10 @@ class RadianteCTRTUnrecognizedTypeError extends RadianteCTRTError<
   typeof RadianteCTRTError.ERR_UNRECOGNIZED_TYPE,
   RadianteCTRTUnrecognizedTypeErrorMetadata
 > {
+  public static is(err: unknown): err is RadianteCTRTUnrecognizedTypeError {
+    return err instanceof RadianteCTRTUnrecognizedTypeError;
+  }
+
   public constructor(
     metadata: RadianteCTRTUnrecognizedTypeErrorMetadata,
     message?: string,

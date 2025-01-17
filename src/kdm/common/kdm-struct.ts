@@ -7,6 +7,7 @@ import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 type RadianteKDMStructConstructor<
   T extends RadianteKDMStructDefinition = RadianteKDMStructDefinition
@@ -100,8 +101,10 @@ abstract class RadianteKDMStruct<
   }
 
   protected override _validate(state: unknown): null | Error {
+    const input = state;
+
     if (state === null || typeof state !== "object") {
-      return new Error("kdm.err_invalid_state");
+      return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
     for (const [key, field] of this._definition) {
@@ -109,7 +112,11 @@ abstract class RadianteKDMStruct<
       const err = field.validate(value);
 
       if (err !== null) {
-        return new Error("kdm.err_invalid_state");
+        return new RadianteKDMInvalidStateError({
+          input,
+          path: [key],
+          state: value
+        });
       }
     }
 

@@ -1,3 +1,8 @@
+import {
+  RadianteInvalidLocaleError,
+  RadianteInvalidLocaleCodeError
+} from "#locale/locale-error";
+
 enum LocaleCode {
   EU_FRENCH = "EUR_fr",
   EU_GERMAN = "EUR_de",
@@ -19,10 +24,8 @@ function isLocaleCode(value: unknown): value is LocaleCode {
   return localecodes.has(<LocaleCode>value);
 }
 
-function normalizeLocaleCode(value: string): LocaleCode {
-  value = value.toLowerCase();
-
-  switch (value) {
+function normalizeLocaleCode(code: string): LocaleCode {
+  switch (code.toLowerCase()) {
     case "chn_zh":
     case "cn_simp_chinese":
       return LocaleCode.CN_CHINESE;
@@ -60,7 +63,7 @@ function normalizeLocaleCode(value: string): LocaleCode {
     case "us_spanish":
       return LocaleCode.US_SPANISH;
     default:
-      throw "locale::err_invalid_locale_code";
+      throw new RadianteInvalidLocaleCodeError({ code });
   }
 }
 
@@ -85,10 +88,8 @@ function isLocale(value: unknown): value is Locale {
   return locales.has(<Locale>value);
 }
 
-function normalizeLocale(value: string): Locale {
-  value = value.toLowerCase();
-
-  switch (value) {
+function normalizeLocale(locale: string): Locale {
+  switch (locale.toLowerCase()) {
     case "chn_zh":
     case "cn_simp_chinese":
       return Locale.CN_CHINESE;
@@ -126,7 +127,7 @@ function normalizeLocale(value: string): Locale {
     case "us_spanish":
       return Locale.US_SPANISH;
     default:
-      throw "locale::err_invalid_locale";
+      throw new RadianteInvalidLocaleError({ locale });
   }
 }
 

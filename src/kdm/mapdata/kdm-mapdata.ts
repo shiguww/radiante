@@ -6,6 +6,7 @@ import type { IRadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import { RadianteKDMI32Parameter } from "#kdm/common/parameter/kdm-i32-parameter";
 import { RadianteKDMStringPointer } from "#kdm/common/primitive/kdm-string-pointer";
 import { RadianteKDMStructArrayPointer } from "#kdm/common/primitive/kdm-struct-array-pointer";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 type IRadianteKDMMapData = IRadianteKDMMapData0x15[];
 
@@ -111,20 +112,26 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
     super._build(buffer);
   }
 
-  protected override _validate(array: unknown): null | Error {
-    if (!Array.isArray(array)) {
-      return new Error("kdm.err_invalid_state");
+  protected override _validate(input: unknown): null | Error {
+    if (!Array.isArray(input)) {
+      return new RadianteKDMInvalidStateError({
+        input,
+        state: input,
+        path: []
+      });
     }
 
-    for (const entry of array) {
-      if (entry === null) {
+    let err: null | RadianteKDMInvalidStateError;
+
+    for (let i = 0; i < input.length; i += 1) {
+      if (input[i] === null) {
         continue;
       }
 
-      const err = new RadianteKDMMapData0x15().validate(entry);
+      err = new RadianteKDMMapData0x15()._validateAt(input, i);
 
       if (err !== null) {
-        return new Error("kdm.err_invalid_state");
+        return err;
       }
     }
 

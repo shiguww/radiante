@@ -1,6 +1,12 @@
+import {
+  KDMEmptyArrayError,
+  RadianteKDMInvalidPointerError,
+  RadianteKDMInvalidStateError,
+  RadianteKDMUnknownArrayError
+} from "#kdm/kdm-error";
 import { RadianteKDMStruct } from "#kdm/common/kdm-struct";
-import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
 import type { RadianteKDMStructObject } from "#kdm/common/kdm-struct";
+import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
 
 import type {
   RadianteKDMBuildContext,
@@ -25,10 +31,10 @@ class RadianteKDMStructArrayPointer<
 
     if (array !== null && array !== undefined) {
       if (array[0] === undefined) {
-        throw "kdm.err_empty_array";
+        throw new KDMEmptyArrayError({ array });
       }
 
-      this._struct = <RadianteKDMStructConstructor<S>>array[0].constructor;
+      this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
     }
   }
 
@@ -57,7 +63,10 @@ class RadianteKDMStructArrayPointer<
     const offset = ctx.instance.arrays.get(this._array);
 
     if (offset === undefined) {
-      throw "kdm.err_unknown_array";
+      throw new RadianteKDMUnknownArrayError({
+        array: this._array,
+        instance: ctx.instance
+      });
     }
 
     this._pointer = offset;
@@ -72,41 +81,55 @@ class RadianteKDMStructArrayPointer<
     const array = ctx.arrays.get(this._pointer);
 
     if (array === undefined) {
-      throw "kdm.err_unknown_pointer";
+      throw new RadianteKDMInvalidPointerError({
+        pointer: this,
+        instance: ctx.instance
+      });
     }
 
     this._array = <S[]>array;
 
     if (array[0] === undefined) {
-      throw "kdm.err_empty_array";
+      throw new KDMEmptyArrayError({ array });
     }
 
-    this._struct = <RadianteKDMStructConstructor<S>>array[0].constructor;
+    this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
   }
 
-  protected override _validate(array: unknown): null | Error {
-    if (array === null) {
+  protected override _validate(state: unknown): null | Error {
+    const input = state;
+
+    if (input === null) {
       return null;
     }
 
     if (this._struct === null) {
-      throw "kdm.err_invalid_state";
+      return new RadianteKDMInvalidStateError({
+        input,
+        state,
+        path: []
+      });
     }
 
-    if (!Array.isArray(array)) {
-      return new Error("kdm.err_invalid_state");
+    if (!Array.isArray(input)) {
+      return new RadianteKDMInvalidStateError({
+        state,
+        input,
+        path: []
+      });
     }
 
-    for (const entry of array) {
-      if (entry === null) {
+    const struct = new this._struct();
+
+    for (let i = 0; i < input.length; i += 1) {
+      if (input[i] === null) {
         continue;
       }
 
-      const struct = new this._struct();
-      const err = struct.validate(entry);
+      const err = struct._validateAt(input, i);
 
       if (err !== null) {
-        return new Error("kdm.err_invalid_state");
+        return err;
       }
     }
 

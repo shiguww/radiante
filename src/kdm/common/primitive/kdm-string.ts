@@ -6,6 +6,12 @@ import type {
   RadianteKDMParseContext
 } from "#kdm/kdm";
 
+import {
+  RadianteKDMError,
+  RadianteKDMFormatError,
+  RadianteKDMInvalidStateError
+} from "#kdm/kdm-error";
+
 class RadianteKDMString extends RadianteKDMEntity<string> {
   public static bytelength(string: string): number {
     return Math.ceil(CTRMemory.bytelength(string + "\0", "utf8") / 4) * 4;
@@ -59,7 +65,10 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
 
     while (buffer.offset % 4 !== 0) {
       if (buffer.u8() !== 0x00) {
-        throw "kdm.err_malformed_file";
+        throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
+          buffer,
+          instance: ctx.instance
+        });
       }
     }
 
@@ -73,9 +82,13 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
     return RadianteKDMString.bytelength(this._string);
   }
 
-  protected override _validate(string: unknown): null | Error {
-    if (typeof string !== "string") {
-      return new Error("kdm.err_invalid_state");
+  protected override _validate(state: unknown): null | Error {
+    if (typeof state !== "string") {
+      return new RadianteKDMInvalidStateError({
+        state,
+        path: [],
+        input: state
+      });
     }
 
     return null;
