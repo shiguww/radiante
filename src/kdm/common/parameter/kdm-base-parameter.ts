@@ -18,7 +18,7 @@ abstract class RadianteKDMBaseParameter<
   N extends string
 > extends RadianteKDMEntity<IRadianteKDMBaseParameter<T, N>> {
   private readonly _entity: N;
-  public readonly constant: RadianteKDMI32;
+  public readonly unknown0: RadianteKDMI32;
   public readonly name: RadianteKDMStringPointer;
   public abstract readonly value: RadianteKDMEntity<T>;
 
@@ -26,7 +26,7 @@ abstract class RadianteKDMBaseParameter<
     super();
 
     this._entity = entity;
-    this.constant = new RadianteKDMI32();
+    this.unknown0 = new RadianteKDMI32();
     this.name = new RadianteKDMStringPointer();
   }
 
@@ -64,7 +64,7 @@ abstract class RadianteKDMBaseParameter<
     ctx: RadianteKDMBuildContext
   ): void {
     this.name.build(buffer, ctx);
-    this.constant.build(buffer, ctx);
+    this.unknown0.build(buffer, ctx);
     this.value.build(buffer, ctx);
   }
 
@@ -73,12 +73,12 @@ abstract class RadianteKDMBaseParameter<
     ctx: RadianteKDMParseContext
   ): void {
     this.name.parse(buffer, ctx);
-    this.constant.parse(buffer, ctx);
+    this.unknown0.parse(buffer, ctx);
     this.value.parse(buffer, ctx);
   }
 
   protected override _sizeof(): number {
-    return this.name.sizeof + this.constant.sizeof + this.value.sizeof;
+    return this.name.sizeof + this.unknown0.sizeof + this.value.sizeof;
   }
 }
 

@@ -66,6 +66,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   private static readonly HEADER_SIZE = 0x28;
   private static readonly MAGIC = new CTRMemory(RADIANTE_KDM_MAGIC);
 
+  public constant: number;
   public readonly strings: Map<string, number>;
   public readonly parameters: RadianteKDMParameter[];
   public readonly arrays: Map<RadianteKDMEntity[], number>;
@@ -85,6 +86,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   ) {
     super();
 
+    this.constant = 0;
     this.arrays = new Map();
     this.strings = new Map();
     this.entities = new Map();
@@ -273,7 +275,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const entity = new constructor();
     const count = (size * 4) / entity.sizeof;
 
-    if (count <= 1) {
+    if (count <= 0) {
       throw "kdm.err_empty_array";
     }
 
@@ -393,7 +395,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   ): void {
     buffer.u32(ctx.instance.parameters.length);
 
-    ctx.instance.parameters.forEach((parameter) => {
+    for (let i = 0; i < ctx.instance.parameters.length; i += 1) {
+      const parameter = ctx.instance.parameters[i]!;
+      const last = i + 1 === ctx.instance.parameters.length;
+
       const id = ctx.entities.get(parameter);
 
       if (id === undefined) {
@@ -422,8 +427,19 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
 
       buffer.u16(id);
       buffer.u16(typeid);
+
+      parameter.unknown0.set(
+        !last
+          ? this._calculateUnknown0FromConstant(
+              CTRMemory.U16_SIZE * 2 + parameter.sizeof,
+              parameter.name.sizeof + buffer.offset,
+              this.constant
+            )
+          : 0
+      );
+
       parameter.build(buffer, ctx);
-    });
+    }
   }
 
   private _parseSection3(
@@ -440,7 +456,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       throw "kdm.err_not_enough_parameters";
     }
 
-    for (const parameter of ctx.instance.parameters) {
+    for (let i = 0; i < ctx.instance.parameters.length; i += 1) {
+      const parameter = ctx.instance.parameters[i]!;
+      const last = i + 1 === ctx.instance.parameters.length;
+
       const id = buffer.u16();
       const type = ctx.instance.types.get(buffer.u16());
 
@@ -449,6 +468,32 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       }
 
       parameter.parse(buffer, ctx);
+
+      if (this.constant === 0) {
+        this.constant = this._calculateConstantFromUnknown0(
+          parameter.sizeof + CTRMemory.U16_SIZE * 2,
+          parameter.unknown0.offset || 0,
+          parameter.unknown0.number
+        );
+      }
+
+      if (last && parameter.unknown0.number !== 0) {
+        throw "kdm.err_invalid_constant";
+      }
+
+      if (
+        !last &&
+        parameter.unknown0.number !==
+          this._calculateConstantFromUnknown0(
+            parameter.sizeof + CTRMemory.U16_SIZE * 2,
+            parameter.unknown0.offset || 0,
+            parameter.unknown0.number
+          )
+      ) {
+        console.log("hello");
+        throw "kdm.err_invalid_constant";
+      }
+
       ctx.instance.entities.set(id, parameter);
     }
   }
@@ -462,13 +507,27 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const structs = Array.from(ctx.instance.structs.entries());
     structs.sort(([idA], [idB]) => idA - idB);
 
-    for (const [id, constructor] of structs) {
+    for (let i = 0; i < structs.length; i += 1) {
+      const [id, constructor] = structs[i]!;
+      const last = i + 1 === structs.length;
+
       const struct = new constructor();
 
       buffer.u16(id);
       buffer.u16(struct.fields.length);
       buffer.u32(0x00000000);
-      buffer.u32(0x00000000); // constant
+
+      buffer.u32(
+        !last
+          ? this._calculateUnknown0FromConstant(
+              CTRMemory.U32_SIZE +
+                CTRMemory.U16_SIZE * 2 +
+                struct.fields.length * CTRMemory.U32_SIZE,
+              buffer.offset,
+              this.constant
+            )
+          : 0
+      );
 
       for (const field of struct.fields) {
         const typeid = ctx.types.get(
@@ -501,7 +560,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       throw "kdm.err_not_enough_struct_definitions";
     }
 
-    for (const [id, constructor] of structs) {
+    for (let i = 0; i < structs.length; i += 1) {
+      const last = i + 1 === structs.length;
+      const [id, constructor] = structs[i]!;
+
       if (buffer.u16() !== id) {
         throw "kdm.err_invalid_struct_definition";
       }
@@ -516,7 +578,36 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
         throw "kdm.err_invalid_struct_definition";
       }
 
-      const constant = buffer.u32();
+      const offset = buffer.offset;
+      const unknown0 = buffer.u32();
+
+      if (this.constant === 0) {
+        this.constant = this._calculateConstantFromUnknown0(
+          CTRMemory.U32_SIZE +
+            CTRMemory.U32_SIZE * struct.fields.length +
+            CTRMemory.U16_SIZE * 2,
+          offset,
+          unknown0
+        );
+      }
+
+      if (last && unknown0 !== 0) {
+        throw "kdm.err_invalid_constant";
+      }
+
+      if (
+        !last &&
+        unknown0 !==
+          this._calculateConstantFromUnknown0(
+            CTRMemory.U32_SIZE +
+              CTRMemory.U32_SIZE * struct.fields.length +
+              CTRMemory.U16_SIZE * 2,
+            offset,
+            unknown0
+          )
+      ) {
+        throw "kdm.err_invalid_constant";
+      }
 
       for (const field of struct.fields) {
         if (field.constructor !== ctx.instance.types.get(buffer.u32())) {
@@ -701,6 +792,22 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       section6,
       section7
     ];
+  }
+
+  private _calculateConstantFromUnknown0(
+    size: number,
+    offset: number,
+    unknown0: number
+  ): number {
+    return unknown0 - offset - size;
+  }
+
+  private _calculateUnknown0FromConstant(
+    size: number,
+    offset: number,
+    constant: number
+  ): number {
+    return constant + offset + size;
   }
 }
 
