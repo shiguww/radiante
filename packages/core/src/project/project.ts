@@ -1,10 +1,10 @@
+import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { CTRT } from "#ctrt/ctrt";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import * as nwtex from "#nw-texture/nw-texture";
-import { RADIANTE_TEMPORARY_DIRECTORY } from "#constants";
 import { isLocale, isLocaleCode, normalizeLocale } from "#locale/locale";
 
 import type {
@@ -660,7 +660,7 @@ class RadianteProject extends CTREventEmitter<
     }
 
     directory = path.resolve(directory, node.name.toLowerCase());
-    
+
     for (const child of node.nodes) {
       await this._processScript(
         child.isDirectory()
@@ -973,9 +973,7 @@ class RadianteProject extends CTREventEmitter<
 }
 
 async function createTemporaryDirectory(): Promise<string> {
-  return await fs.mkdtemp(
-    path.resolve(RADIANTE_TEMPORARY_DIRECTORY, `tmp-${Date.now()}-`)
-  );
+  return await fs.mkdtemp(path.resolve(os.tmpdir(), `tmp-${Date.now()}-`));
 }
 
 export { RadianteProject, RadianteProject as Project };
