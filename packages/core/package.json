@@ -10,7 +10,6 @@
     "@types/node": "catalog:",
     "@libctr/tsconfig": "catalog:"
   },
-
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -39,4 +38,3 @@
   "types": "dist/index.d.ts",
   "version": "0.0.0"
 }
-

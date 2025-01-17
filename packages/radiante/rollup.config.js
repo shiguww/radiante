@@ -14,7 +14,14 @@ const commit = async () =>
 
 export default defineConfig([
   {
-    external: ["pngjs", "libctr", "winston", "commander", "@radiante/core", "@inquirer/prompts"],
+    external: [
+      "pngjs",
+      "libctr",
+      "winston",
+      "commander",
+      "@radiante/core",
+      "@inquirer/prompts"
+    ],
     input: "index.ts",
     output: { format: "cjs", file: "build/radiante.js" },
     plugins: [

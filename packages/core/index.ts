@@ -1,4 +1,4 @@
-//#region 
+//#region
 export * as ctrt from "#ctrt/index";
 
 export * as locale from "#locale/index";
@@ -12,7 +12,7 @@ export * as proj from "#project/index";
 export * as project from "#project/index";
 //#endregion
 
-//#region 
+//#region
 export * from "libctr";
 
 export * from "#ctrt/ctrt";

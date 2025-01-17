@@ -178,10 +178,13 @@ class RadianteCTRT extends CTRBinarySerializable {
     buffer.endianness = "LE";
 
     if (buffer.length < 16) {
-      throw new RadianteCTRTFormatError(RadianteCTRTError.ERR_BUFFER_TOO_SMALL, {
-        buffer,
-        texture: this
-      });
+      throw new RadianteCTRTFormatError(
+        RadianteCTRTError.ERR_BUFFER_TOO_SMALL,
+        {
+          buffer,
+          texture: this
+        }
+      );
     }
 
     buffer.seek(-16);
