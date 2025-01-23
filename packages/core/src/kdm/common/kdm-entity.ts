@@ -1,3 +1,4 @@
+import { _validateAt } from "#kdm/kdm-utils";
 import { CTRBinarySerializable } from "libctr";
 import type { CTREventEmitterEventMap } from "libctr";
 import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
@@ -26,33 +27,22 @@ abstract class RadianteKDMEntity<T = unknown> extends CTRBinarySerializable<
     return [];
   }
 
-  public _validateAt(
-    input: object,
-    path: string | number
+  public override validate(
+    input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = Reflect.get(input, path);
-    const err = this.validate(state);
+    return this._validate(input);
+  }
 
-    if (err !== null) {
-      if (err instanceof RadianteKDMInvalidStateError) {
-        err.metadata.path.push(path);
-        Object.defineProperty(err.metadata, "input", { value: input });
+  protected abstract override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError;
 
-        return err;
-      }
-
-      return new RadianteKDMInvalidStateError(
-        {
-          input,
-          state,
-          path: [path]
-        },
-        undefined,
-        err
-      );
-    }
-
-    return null;
+  public _validateAt(
+    input: unknown,
+    state: unknown,
+    path: (string | number)[]
+  ): null | RadianteKDMInvalidStateError {
+    return _validateAt(input, state, path, this);
   }
 }
 

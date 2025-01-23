@@ -1,9 +1,4 @@
-import {
-  KDMEmptyArrayError,
-  RadianteKDMInvalidPointerError,
-  RadianteKDMInvalidStateError,
-  RadianteKDMUnknownArrayError
-} from "#kdm/kdm-error";
+import { _validateArray } from "#kdm/kdm-utils";
 import { RadianteKDMStruct } from "#kdm/common/kdm-struct";
 import type { RadianteKDMStructObject } from "#kdm/common/kdm-struct";
 import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
@@ -12,6 +7,13 @@ import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
+
+import {
+  KDMEmptyArrayError,
+  RadianteKDMInvalidPointerError,
+  RadianteKDMInvalidStateError,
+  RadianteKDMUnknownArrayError
+} from "#kdm/kdm-error";
 
 type RadianteKDMStructConstructor<
   S extends RadianteKDMStruct = RadianteKDMStruct
@@ -96,8 +98,10 @@ class RadianteKDMStructArrayPointer<
     this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
   }
 
-  protected override _validate(state: unknown): null | Error {
-    const input = state;
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const state = input;
 
     if (input === null) {
       return null;
@@ -111,29 +115,7 @@ class RadianteKDMStructArrayPointer<
       });
     }
 
-    if (!Array.isArray(input)) {
-      return new RadianteKDMInvalidStateError({
-        state,
-        input,
-        path: []
-      });
-    }
-
-    const struct = new this._struct();
-
-    for (let i = 0; i < input.length; i += 1) {
-      if (input[i] === null) {
-        continue;
-      }
-
-      const err = struct._validateAt(input, i);
-
-      if (err !== null) {
-        return err;
-      }
-    }
-
-    return null;
+    return _validateArray(input, input, [], new this._struct());
   }
 }
 

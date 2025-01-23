@@ -1,14 +1,18 @@
 import { CTRMemory } from "libctr";
 import { RadianteKDM } from "#kdm/kdm";
+import type { CTRMemoryArray } from "libctr";
 import { lexicographicalSorting } from "#utils";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import type { IRadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import { RadianteKDMI32Parameter } from "#kdm/common/parameter/kdm-i32-parameter";
 import { RadianteKDMStringPointer } from "#kdm/common/primitive/kdm-string-pointer";
 import { RadianteKDMStructArrayPointer } from "#kdm/common/primitive/kdm-struct-array-pointer";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
-type IRadianteKDMMapData = IRadianteKDMMapData0x15[];
+interface IRadianteKDMMapData {
+  map_data_table: string[];
+  maps: IRadianteKDMMapData0x15[];
+}
 
 class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
   private static readonly MAP_DATA_TABLE = "mapDataTable";
@@ -17,7 +21,7 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
   private readonly _mapDataTableLen: RadianteKDMI32Parameter;
   private readonly _mapDataTable: RadianteKDMStructArrayPointer<RadianteKDMMapData0x15>[];
 
-  public constructor(bufferOrState?: Buffer | CTRMemory | IRadianteKDMMapData) {
+  public constructor(buffer?: CTRMemoryArray) {
     const mapDataTable: RadianteKDMStructArrayPointer<RadianteKDMMapData0x15>[] =
       [];
 
@@ -39,61 +43,54 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
     this._mapDataTable = mapDataTable;
     this._mapDataTableLen = mapDataTableLen;
 
-    if (Buffer.isBuffer(bufferOrState) || bufferOrState instanceof CTRMemory) {
-      this.parse(bufferOrState);
-    } else if (bufferOrState !== undefined) {
-      this.set(bufferOrState);
+    if (buffer !== undefined) {
+      this.parse(buffer);
     }
   }
 
   protected override _get(): IRadianteKDMMapData {
-    this._mapDataTable.sort(
-      (a, b) =>
-        Number(this.arrays.get(a.array!)) - Number(this.arrays.get(b.array!))
-    );
+    const maps = Array.from(this.arrays.keys())
+      .filter((arr) => arr.every((e) => e instanceof RadianteKDMMapData0x15))
+      .map((arr) => arr.map((e) => e.get())[0])
+      .filter((m) => m !== undefined);
 
-    return this._mapDataTable
-      .map((e) => e.get())
-      .flat()
-      .filter((e) => e !== null);
+    const map_data_table = this._mapDataTable
+      .map((p) => p.array?.[0]?.struct.unknown0 || null)
+      .filter((m) => m !== null);
+
+    return { maps, map_data_table };
   }
 
-  protected override _set(array: IRadianteKDMMapData): void {
-    this._mapDataTable.length = 0;
+  protected override _set(state: IRadianteKDMMapData): void {
+    for (const map of state.maps) {
+      const array = [new RadianteKDMMapData0x15(map)];
+      this.arrays.set(array, 0);
 
-    for (const entry of array) {
-      const array = entry === null ? null : [new RadianteKDMMapData0x15(entry)];
-      const pointer = new RadianteKDMStructArrayPointer(array);
-
-      this._mapDataTable.push(pointer);
+      if (
+        map.unknown0 !== null &&
+        state.map_data_table.includes(map.unknown0)
+      ) {
+        const pointer = new RadianteKDMStructArrayPointer(array);
+        this._mapDataTable.push(pointer);
+      }
     }
   }
 
   protected override _build(buffer: CTRMemory): void {
     let id = 0x16;
 
-    this._mapDataTable.forEach((pointer) => {
-      if (pointer.array === null) {
-        return;
-      }
+    this._mapDataTable.push(new RadianteKDMStructArrayPointer(null));
 
-      this.arrays.set(pointer.array, 0);
-      this.entities.set(id++, pointer.array);
-
-      pointer.array.forEach((e) =>
-        e.strings.forEach((s) => {
-          if (s.string !== "" && !this.strings.has(s.string)) {
-            this.strings.set(s.string, 0);
-          }
-        })
-      );
+    this.arrays.forEach((_, arr) => {
+      this.entities.set(id++, arr);
+      arr.forEach((e) => this._addString(...e.strings));
     });
 
     this.entities.set(id++, this._mapDataTable);
-    this.strings.set(RadianteKDMMapData.MAP_DATA_TABLE, 0);
+    this._addString(RadianteKDMMapData.MAP_DATA_TABLE);
 
     this.entities.set(id++, this._mapDataTableLen);
-    this.strings.set(RadianteKDMMapData.MAP_DATA_TABLE_LEN, 0);
+    this._addString(RadianteKDMMapData.MAP_DATA_TABLE_LEN);
 
     this._mapDataTable.sort((a, b) => {
       if (a.first !== null && b.first !== null) {
@@ -106,38 +103,16 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
       return 0;
     });
 
-    this._mapDataTable.push(new RadianteKDMStructArrayPointer(null));
     this._mapDataTableLen.value.set(this._mapDataTable.length);
-
     super._build(buffer);
   }
 
-  protected override _validate(input: unknown): null | Error {
-    if (!Array.isArray(input)) {
-      return new RadianteKDMInvalidStateError({
-        input,
-        state: input,
-        path: []
-      });
-    }
-
-    let err: null | RadianteKDMInvalidStateError;
-
-    for (let i = 0; i < input.length; i += 1) {
-      if (input[i] === null) {
-        continue;
-      }
-
-      err = new RadianteKDMMapData0x15()._validateAt(input, i);
-
-      if (err !== null) {
-        return err;
-      }
-    }
-
+  protected override _validate(
+    state: unknown
+  ): null | RadianteKDMInvalidStateError {
     return null;
   }
 }
 
 export { RadianteKDMMapData, RadianteKDMMapData as KDMMapData };
-export type { IRadianteKDMMapData, IRadianteKDMMapData0x15 as IKDMMapData0x15 };
+export type { IRadianteKDMMapData, IRadianteKDMMapData as IKDMMapData };

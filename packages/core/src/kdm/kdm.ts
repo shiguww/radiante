@@ -1,6 +1,7 @@
 import { CTRMemory, CTRBinarySerializable } from "libctr";
 import { RadianteKDMF32 } from "#kdm/common/primitive/kdm-f32";
 import { RadianteKDMI32 } from "#kdm/common/primitive/kdm-i32";
+import type { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMString } from "#kdm/common/primitive/kdm-string";
 import type { RadianteKDMStructConstructor } from "#kdm/common/kdm-struct";
 import type { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
@@ -22,8 +23,8 @@ import {
   RadianteKDMUnknownTableError,
   RadianteKDMUnknownTypeIDError,
   RadianteKDMUnknownEntityError,
-  RadianteKDMInvalidParameterTypeError,
   RadianteKDMInvalidHeaderError,
+  RadianteKDMInvalidParameterTypeError,
   RadianteKDMInvalidStructDefinitionError
 } from "#kdm/kdm-error";
 
@@ -114,15 +115,15 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       [0x03, RadianteKDMStringPointer],
       [0x0f, RadianteKDMStructArrayPointer]
     ]);
-
-    for (const array of this.tables.values()) {
-      this.arrays.set(array, 0);
-    }
   }
 
   public get types(): Map<number, RadianteKDMEntityConstructor> {
     return new Map([...this.structs, ...this.primitives]);
   }
+
+  protected abstract override _validate(
+    state: unknown
+  ): null | RadianteKDMInvalidStateError;
 
   protected override _build(buffer: CTRMemory): void {
     buffer.encoding = "utf8";
@@ -227,14 +228,17 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     return section7 + CTRMemory.U32_SIZE;
   }
 
-  private _isTable(arr: RadianteKDMEntity[]): boolean {
-    for (const table of this.tables.values()) {
-      if (arr === table) {
-        return true;
+  protected _addString(
+    ...strings: (null | string | RadianteKDMStringPointer)[]
+  ): void {
+    for (const string of strings) {
+      const s =
+        string !== null && typeof string === "object" ? string.string : string;
+
+      if (s !== null && !this.strings.has(s)) {
+        this.strings.set(s, 0);
       }
     }
-
-    return false;
   }
 
   private _buildArray(
@@ -281,7 +285,8 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   private _parseArray(
     buffer: CTRMemory,
     ctx: RadianteKDMParseContext,
-    array: RadianteKDMEntity[]
+    array: RadianteKDMEntity[],
+    isTable?: boolean
   ): void {
     const id = buffer.u16();
     const size = buffer.u16();
@@ -311,10 +316,12 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       array.push(entity);
     }
 
-    ctx.arrays.set(offset, array);
-
     ctx.instance.entities.set(id, array);
-    ctx.instance.arrays.set(array, offset);
+
+    if (!isTable) {
+      ctx.arrays.set(offset, array);
+      ctx.instance.arrays.set(array, offset);
+    }
   }
 
   private _buildHeader(buffer: CTRMemory, header: RadianteKDMHeader): void {
@@ -718,13 +725,11 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     buffer: CTRMemory,
     ctx: RadianteKDMBuildContext
   ): void {
-    buffer.u32(ctx.instance.arrays.size - ctx.instance.tables.size);
+    buffer.u32(ctx.instance.arrays.size);
 
-    ctx.instance.arrays.forEach((_, array) => {
-      if (!this._isTable(array)) {
-        this._buildArray(buffer, ctx, array);
-      }
-    });
+    ctx.instance.arrays.forEach((_, array) =>
+      this._buildArray(buffer, ctx, array)
+    );
   }
 
   private _parseSection5(
@@ -778,6 +783,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const string = new RadianteKDMStringPointer().parse(buffer, ctx);
       string.dereference(ctx);
 
+      if (string.string === null) {
+        throw "kdm.err_invalid_table_name";
+      }
+
       names.push(string.string);
     }
 
@@ -790,7 +799,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
         throw new RadianteKDMUnknownTableError({ table: name, instance: this });
       }
 
-      ctx.instance._parseArray(buffer, ctx, table[1]);
+      ctx.instance._parseArray(buffer, ctx, table[1], true);
     });
 
     if (buffer.offset !== header.section7) {
@@ -880,10 +889,8 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     offset += CTRMemory.U32_SIZE;
 
     this.arrays.forEach((_, arr) => {
-      if (!this._isTable(arr)) {
-        offset += CTRMemory.U16_SIZE * 4;
-        arr.forEach((e) => (offset += e.sizeof));
-      }
+      offset += CTRMemory.U16_SIZE * 4;
+      arr.forEach((e) => (offset += e.sizeof));
     });
     //#endregion
 

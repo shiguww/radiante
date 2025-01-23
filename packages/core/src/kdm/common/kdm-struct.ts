@@ -100,23 +100,20 @@ abstract class RadianteKDMStruct<
       .reduce((prev, curr) => prev + curr, 0);
   }
 
-  protected override _validate(state: unknown): null | Error {
-    const input = state;
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const state: unknown = input;
 
-    if (state === null || typeof state !== "object") {
+    if (input === null || typeof input !== "object") {
       return new RadianteKDMInvalidStateError({ input, state, path: [] });
     }
 
     for (const [key, field] of this._definition) {
-      const value = Reflect.get(state, key);
-      const err = field.validate(value);
+      const err = field._validateAt(input, Reflect.get(input, key), [key]);
 
       if (err !== null) {
-        return new RadianteKDMInvalidStateError({
-          input,
-          path: [key],
-          state: value
-        });
+        return err;
       }
     }
 

@@ -1,42 +1,47 @@
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
 
 import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
-class RadianteKDMStringPointer extends RadianteKDMPointer<string> {
-  public string: string;
+class RadianteKDMStringPointer extends RadianteKDMPointer<null | string> {
+  public string: null | string;
 
   public constructor(string?: string) {
     super();
 
-    this.string = "";
+    this.string = null;
 
     if (string !== undefined) {
       this.set(string);
     }
   }
 
-  protected override _get(): string {
-    return this.string;
+  protected override _get(): null | string {
+    return this.string || null;
   }
 
-  protected override _set(string: string): void {
-    this.string = string;
+  protected override _set(string: null | string): void {
+    this.string = string || null;
   }
 
   protected override _resolve(ctx: RadianteKDMBuildContext): void {
-    this._pointer = ctx.instance.strings.get(this.string) || 0;
+    this._pointer =
+      this.string === null ? 0 : ctx.instance.strings.get(this.string) || 0;
   }
 
-  protected override _validate(state: unknown): null | Error {
-    if (typeof state !== "string") {
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const state = input;
+
+    if (input !== null && typeof input !== "string") {
       return new RadianteKDMInvalidStateError({
+        input,
         state,
-        path: [],
-        input: state
+        path: []
       });
     }
 
@@ -44,7 +49,11 @@ class RadianteKDMStringPointer extends RadianteKDMPointer<string> {
   }
 
   protected override _dereference(ctx: RadianteKDMParseContext): void {
-    this.string = ctx.strings.get(this._pointer) || "";
+    this.string = null;
+
+    if (this._pointer !== 0) {
+      this.string = ctx.strings.get(this._pointer) || null;
+    }
   }
 }
 

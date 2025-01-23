@@ -82,12 +82,16 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
     return RadianteKDMString.bytelength(this._string);
   }
 
-  protected override _validate(state: unknown): null | Error {
-    if (typeof state !== "string") {
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const state = input;
+
+    if (typeof input !== "string") {
       return new RadianteKDMInvalidStateError({
+        input,
         state,
-        path: [],
-        input: state
+        path: []
       });
     }
 

@@ -41,8 +41,10 @@ abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
     return CTRMemory.sizeof(this.type);
   }
 
-  protected override _validate(state: unknown): null | Error {
-    const input = state;
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const state = input;
 
     if (typeof input !== "number") {
       return new RadianteKDMInvalidStateError({ input, state, path: [] });
