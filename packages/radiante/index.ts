@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { join, resolve } from "node:path";
 import { env, platform } from "node:process";
 import { existsSync as exists } from "node:fs";
-import { RadianteProject } from "@radiante/core";
+import { RadianteProject, setTemporaryDirectory } from "@radiante/core";
 import { input, confirm } from "@inquirer/prompts";
 
 declare const _RADIANTE_ROLLUP: true | undefined;
@@ -25,6 +25,7 @@ const _RADIANTE_DIRECTORY =
     : resolve(homedir(), ".radiante");
 
 const RADIANTE_LOG_DIRECTORY = resolve(_RADIANTE_DIRECTORY, "log");
+const RADIANTE_TMP_DIRECTORY = resolve(_RADIANTE_DIRECTORY, "tmp");
 
 const RADIANTE_ROLLUP = typeof _RADIANTE_ROLLUP !== "undefined";
 
@@ -102,12 +103,15 @@ async function main(): Promise<void> {
   await _main().catch(logger.error);
 }
 
-async function _main(): Promise<void> {
-  //#region
-  await fs.mkdir(_RADIANTE_DIRECTORY, { recursive: true });
+async function _init(): Promise<void> {
   await fs.mkdir(RADIANTE_LOG_DIRECTORY, { recursive: true });
-  //#endregion
+  await fs.mkdir(RADIANTE_TMP_DIRECTORY, { recursive: true });
 
+  setTemporaryDirectory(RADIANTE_TMP_DIRECTORY);
+}
+
+async function _main(): Promise<void> {
+  await _init();
   await program.parseAsync(process.argv);
 }
 

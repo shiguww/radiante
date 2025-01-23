@@ -1,10 +1,10 @@
-import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { CTRT } from "#ctrt/ctrt";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import * as nwtex from "#nw-texture/nw-texture";
+import { createTemporaryDirectory } from "#utils";
 import { isLocale, isLocaleCode, normalizeLocale } from "#locale/locale";
 
 import type {
@@ -970,10 +970,6 @@ class RadianteProject extends CTREventEmitter<
 
     this.emit("create.romfs.node.process.end", node);
   }
-}
-
-async function createTemporaryDirectory(): Promise<string> {
-  return await fs.mkdtemp(path.resolve(os.tmpdir(), `tmp-${Date.now()}-`));
 }
 
 export { RadianteProject, RadianteProject as Project };

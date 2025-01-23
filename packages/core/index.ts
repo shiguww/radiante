@@ -24,4 +24,5 @@ export * from "#locale/locale-error";
 export * from "#nw-texture/nw-texture-error";
 
 export * from "#project/project";
+export * from "#utils";
 //#endregion

@@ -1,7 +1,7 @@
 import { CTRMemory } from "libctr";
 import { RadianteKDM } from "#kdm/kdm";
 import type { CTRMemoryArray } from "libctr";
-import { lexicographicalSorting } from "#utils";
+import { _lexicographicalSorting } from "#utils";
 import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import type { IRadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
@@ -94,7 +94,7 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
 
     this._mapDataTable.sort((a, b) => {
       if (a.first !== null && b.first !== null) {
-        return lexicographicalSorting(
+        return _lexicographicalSorting(
           a.first.struct.unknown0 || "",
           b.first.struct.unknown0 || ""
         );
