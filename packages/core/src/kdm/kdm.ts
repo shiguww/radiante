@@ -1,4 +1,3 @@
-import { CTRMemory, CTRBinarySerializable } from "libctr";
 import { RadianteKDMF32 } from "#kdm/common/primitive/kdm-f32";
 import { RadianteKDMI32 } from "#kdm/common/primitive/kdm-i32";
 import type { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
@@ -16,6 +15,13 @@ import type {
 } from "#kdm/common/kdm-entity";
 
 import {
+  CTRMemory,
+  CTRMemoryOOBError,
+  CTRBinarySerializable,
+  CTREventEmitterDefaultEventMap
+} from "libctr";
+
+import {
   RadianteKDMError,
   RadianteKDMFormatError,
   RadianteKDMEmptyArrayError,
@@ -25,7 +31,9 @@ import {
   RadianteKDMUnknownEntityError,
   RadianteKDMInvalidHeaderError,
   RadianteKDMInvalidParameterTypeError,
-  RadianteKDMInvalidStructDefinitionError
+  RadianteKDMInvalidStructDefinitionError,
+  RadianteKDMInvalidCountError,
+  RadianteKDMInvalidConstantError
 } from "#kdm/kdm-error";
 
 const RADIANTE_KDM_MAGIC = [
@@ -75,7 +83,27 @@ interface RadianteKDMHeader {
   sections: RadianteKDMSectionOffsets;
 }
 
-abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
+interface RadianteKDMPartialHeader {
+  magic: number[];
+  section0?: number;
+  section1?: number;
+  section2?: number;
+  section3?: number;
+  section4?: number;
+  section5?: number;
+  section6?: number;
+  section7?: number;
+  sections?: number[];
+}
+
+abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
+  S,
+  CTREventEmitterDefaultEventMap,
+  undefined,
+  undefined,
+  RadianteKDMFormatError,
+  RadianteKDMFormatError
+> {
   private static readonly SECTION_COUNT = 8;
   private static readonly HEADER_SIZE = 0x28;
   private static readonly MAGIC = new CTRMemory(RADIANTE_KDM_MAGIC);
@@ -205,10 +233,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     } satisfies RadianteKDMParseContext;
 
     if (buffer.offset !== header.section0) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
 
     this._parseSection0(buffer, ctx, header);
@@ -226,6 +251,38 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   protected override _sizeof(): number {
     const section7 = this._calculateSectionOffsets()[7];
     return section7 + CTRMemory.U32_SIZE;
+  }
+
+  protected override _builderr(
+    err: unknown,
+    buffer: CTRMemory
+  ): RadianteKDMFormatError {
+    return new RadianteKDMFormatError(
+      RadianteKDMError.ERR_BUILD,
+      buffer,
+      this,
+      undefined,
+      err
+    );
+  }
+
+  protected override _parseerr(
+    err: unknown,
+    buffer: CTRMemory
+  ): RadianteKDMFormatError {
+    return new RadianteKDMFormatError(
+      RadianteKDMError.ERR_PARSE,
+      buffer,
+      this,
+      undefined,
+      err instanceof CTRMemoryOOBError
+        ? new RadianteKDMError(
+            RadianteKDMError.ERR_UNEXPECTED_END_OF_FILE,
+            undefined,
+            err
+          )
+        : err
+    );
   }
 
   protected _addString(
@@ -247,23 +304,20 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     array: RadianteKDMEntity[]
   ): void {
     if (array[0] === undefined) {
-      throw new RadianteKDMEmptyArrayError({ array });
+      throw new RadianteKDMEmptyArrayError(array);
     }
 
     const id = ctx.entities.get(array);
 
     if (id === undefined) {
-      throw new RadianteKDMUnknownEntityError({
-        entity: array,
-        instance: ctx.instance
-      });
+      throw new RadianteKDMUnknownEntityError(array);
     }
 
     const type = array[0]._type;
     const typeid = ctx.types.get(type);
 
     if (typeid === undefined) {
-      throw new RadianteKDMUnknownTypeError({ type, instance: ctx.instance });
+      throw new RadianteKDMUnknownTypeError(type);
     }
 
     const size = array.map((e) => e.sizeof).reduce((p, c) => p + c) / 4;
@@ -296,17 +350,14 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const type = ctx.instance.types.get(typeid);
 
     if (type === undefined) {
-      throw new RadianteKDMUnknownTypeIDError({
-        typeid,
-        instance: ctx.instance
-      });
+      throw new RadianteKDMUnknownTypeIDError(typeid);
     }
 
     const entity = new type();
     const count = (size * 4) / entity.sizeof;
 
     if (count <= 0) {
-      throw new RadianteKDMEmptyArrayError({ array });
+      throw new RadianteKDMEmptyArrayError(array);
     }
 
     const offset = buffer.offset;
@@ -336,10 +387,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const magic = buffer.raw({ count: RadianteKDM.MAGIC.length }).array;
 
     if (!RadianteKDM.MAGIC.equals(magic)) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_NOT_A_KDM_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_NOT_A_KDM_FILE);
     }
 
     const sections: number[] = [];
@@ -348,23 +396,17 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       sections.push(buffer.u32() * 4);
     }
 
-    if (
-      buffer.offset !== RadianteKDM.HEADER_SIZE ||
-      sections.length !== RadianteKDM.SECTION_COUNT
-    ) {
-      throw new RadianteKDMInvalidHeaderError({ buffer, instance: this });
-    }
+    const section0 = sections[0];
+    const section1 = sections[1];
+    const section2 = sections[2];
+    const section3 = sections[3];
+    const section4 = sections[4];
+    const section5 = sections[5];
+    const section6 = sections[6];
+    const section7 = sections[7];
 
-    const section0 = sections[0]!;
-    const section1 = sections[1]!;
-    const section2 = sections[2]!;
-    const section3 = sections[3]!;
-    const section4 = sections[4]!;
-    const section5 = sections[5]!;
-    const section6 = sections[6]!;
-    const section7 = sections[7]!;
-
-    return {
+    const header = {
+      magic,
       section0,
       section1,
       section2,
@@ -373,9 +415,18 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       section5,
       section6,
       section7,
-      magic: <RadianteKDMHeader["magic"]>(<unknown>magic),
-      sections: <RadianteKDMHeader["sections"]>(<unknown>sections)
+      sections
     };
+
+    if (
+      sections.length !== 8 ||
+      buffer.offset !== RadianteKDM.HEADER_SIZE ||
+      sections.length !== RadianteKDM.SECTION_COUNT
+    ) {
+      throw new RadianteKDMInvalidHeaderError(header);
+    }
+
+    return <RadianteKDMHeader>(<unknown>header);
   }
 
   private _buildSection0(
@@ -401,10 +452,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     }
 
     if (buffer.offset !== header.section1) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -415,18 +463,8 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   private _parseSection1(buffer: CTRMemory, header: RadianteKDMHeader): void {
     const count = buffer.u32();
 
-    if (count !== 0x00000000) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
-    }
-
-    if (buffer.offset !== header.section2) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+    if (count !== 0x00000000 || buffer.offset !== header.section2) {
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -437,18 +475,8 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   private _parseSection2(buffer: CTRMemory, header: RadianteKDMHeader): void {
     const count = buffer.u32();
 
-    if (count !== 0x00000000) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
-    }
-
-    if (buffer.offset !== header.section3) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+    if (count !== 0x00000000 || buffer.offset !== header.section3) {
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -465,10 +493,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const id = ctx.entities.get(parameter);
 
       if (id === undefined) {
-        throw new RadianteKDMUnknownEntityError({
-          entity: parameter,
-          instance: this
-        });
+        throw new RadianteKDMUnknownEntityError(parameter);
       }
 
       const type =
@@ -479,7 +504,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const typeid = ctx.types.get(type);
 
       if (typeid === undefined) {
-        throw new RadianteKDMUnknownTypeError({ type, instance: this });
+        throw new RadianteKDMUnknownTypeError(type);
       }
 
       buffer.u16(id);
@@ -507,9 +532,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const count = buffer.u32();
 
     if (count !== ctx.instance.parameters.length) {
-      throw new RadianteKDMFormatError(
+      throw new RadianteKDMInvalidCountError(
         RadianteKDMError.ERR_INVALID_PARAMETER_COUNT,
-        { buffer, count, instance: this }
+        count,
+        ctx.instance.parameters.length
       );
     }
 
@@ -523,56 +549,38 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const type = ctx.instance.types.get(typeid);
 
       if (type === undefined) {
-        throw new RadianteKDMUnknownTypeIDError({ typeid, instance: this });
+        throw new RadianteKDMUnknownTypeIDError(typeid);
       }
 
       if (parameter.value._type !== type) {
-        throw new RadianteKDMInvalidParameterTypeError({
-          type,
-          instance: this
-        });
+        throw new RadianteKDMInvalidParameterTypeError(type);
       }
 
       parameter.parse(buffer, ctx);
 
+      const constant = this._calculateConstantFromUnknown0(
+        parameter.sizeof + CTRMemory.U16_SIZE * 2,
+        parameter.unknown0.offset || 0,
+        parameter.unknown0.number
+      );
+
       if (this.constant === 0) {
-        this.constant = this._calculateConstantFromUnknown0(
-          parameter.sizeof + CTRMemory.U16_SIZE * 2,
-          parameter.unknown0.offset || 0,
-          parameter.unknown0.number
-        );
+        this.constant = constant;
       }
 
-      if (last && parameter.unknown0.number !== 0) {
-        throw new RadianteKDMFormatError(
-          RadianteKDMError.ERR_INVALID_CONSTANT,
-          { buffer, instance: this }
-        );
+      if (last && constant !== 0) {
+        throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
 
-      if (
-        !last &&
-        parameter.unknown0.number !==
-          this._calculateConstantFromUnknown0(
-            parameter.sizeof + CTRMemory.U16_SIZE * 2,
-            parameter.unknown0.offset || 0,
-            parameter.unknown0.number
-          )
-      ) {
-        throw new RadianteKDMFormatError(
-          RadianteKDMError.ERR_INVALID_CONSTANT,
-          { buffer, instance: this }
-        );
+      if (!last && constant !== this.constant) {
+        throw new RadianteKDMInvalidConstantError(constant, this.constant);
       }
 
       ctx.instance.entities.set(id, parameter);
     }
 
     if (buffer.offset !== header.section4) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -612,7 +620,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
         const typeid = ctx.types.get(type);
 
         if (typeid === undefined) {
-          throw new RadianteKDMUnknownTypeError({ type, instance: this });
+          throw new RadianteKDMUnknownTypeError(type);
         }
 
         buffer.u32(typeid);
@@ -631,9 +639,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     structs.sort(([idA], [idB]) => idA - idB);
 
     if (count !== structs.length) {
-      throw new RadianteKDMFormatError(
+      throw new RadianteKDMInvalidCountError(
         RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION_COUNT,
-        { buffer, count, instance: this }
+        count,
+        structs.length
       );
     }
 
@@ -642,71 +651,45 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const [id, constructor] = structs[i]!;
 
       if (buffer.u16() !== id) {
-        throw new RadianteKDMInvalidStructDefinitionError({
-          typeid: id,
-          instance: this
-        });
+        throw new RadianteKDMInvalidStructDefinitionError(id);
       }
 
       const struct = new constructor();
 
       if (buffer.u16() !== struct.fields.length) {
-        throw new RadianteKDMInvalidStructDefinitionError({
-          typeid: id,
-          instance: this
-        });
+        throw new RadianteKDMInvalidStructDefinitionError(id);
       }
 
       if (buffer.u32() !== 0x00000000) {
-        throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-          buffer,
-          instance: this
-        });
+        throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
 
       const offset = buffer.offset;
       const unknown0 = buffer.u32();
 
+      const constant = this._calculateConstantFromUnknown0(
+        CTRMemory.U32_SIZE +
+          CTRMemory.U32_SIZE * struct.fields.length +
+          CTRMemory.U16_SIZE * 2,
+        offset,
+        unknown0
+      );
+
       if (this.constant === 0) {
-        this.constant = this._calculateConstantFromUnknown0(
-          CTRMemory.U32_SIZE +
-            CTRMemory.U32_SIZE * struct.fields.length +
-            CTRMemory.U16_SIZE * 2,
-          offset,
-          unknown0
-        );
+        this.constant = constant;
       }
 
       if (last && unknown0 !== 0) {
-        throw new RadianteKDMFormatError(
-          RadianteKDMError.ERR_INVALID_CONSTANT,
-          { buffer, instance: this }
-        );
+        throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
 
-      if (
-        !last &&
-        unknown0 !==
-          this._calculateConstantFromUnknown0(
-            CTRMemory.U32_SIZE +
-              CTRMemory.U32_SIZE * struct.fields.length +
-              CTRMemory.U16_SIZE * 2,
-            offset,
-            unknown0
-          )
-      ) {
-        throw new RadianteKDMFormatError(
-          RadianteKDMError.ERR_INVALID_CONSTANT,
-          { buffer, instance: this }
-        );
+      if (!last && constant !== this.constant) {
+        throw new RadianteKDMInvalidConstantError(constant, this.constant);
       }
 
       for (const field of struct.fields) {
         if (field._type !== ctx.instance.types.get(buffer.u32())) {
-          throw new RadianteKDMInvalidStructDefinitionError({
-            typeid: id,
-            instance: this
-          });
+          throw new RadianteKDMInvalidStructDefinitionError(id);
         }
       }
 
@@ -714,10 +697,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     }
 
     if (buffer.offset !== header.section5) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -744,10 +724,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     }
 
     if (buffer.offset !== header.section6) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -771,9 +748,10 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
     const count = buffer.u32();
 
     if (count !== ctx.instance.tables.size) {
-      throw new RadianteKDMFormatError(
+      throw new RadianteKDMInvalidCountError(
         RadianteKDMError.ERR_INVALID_TABLE_COUNT,
-        { buffer, count, instance: this }
+        count,
+        ctx.instance.tables.size
       );
     }
 
@@ -796,17 +774,14 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
       const table = tables.find(([s]) => s.string === name);
 
       if (table === undefined) {
-        throw new RadianteKDMUnknownTableError({ table: name, instance: this });
+        throw new RadianteKDMUnknownTableError(name);
       }
 
       ctx.instance._parseArray(buffer, ctx, table[1], true);
     });
 
     if (buffer.offset !== header.section7) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -817,18 +792,8 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<S> {
   private _parseSection7(buffer: CTRMemory): void {
     const count = buffer.u32();
 
-    if (count !== 0x00000000) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
-    }
-
-    if (!buffer.ended) {
-      throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-        buffer,
-        instance: this
-      });
+    if (count !== 0x00000000 || !buffer.ended) {
+      throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
     }
   }
 
@@ -946,5 +911,7 @@ export type {
   RadianteKDMBuildContext,
   RadianteKDMBuildContext as KDMBuildContext,
   RadianteKDMParseContext,
-  RadianteKDMParseContext as KDMParseContext
+  RadianteKDMParseContext as KDMParseContext,
+  RadianteKDMPartialHeader,
+  RadianteKDMPartialHeader as KDMPartialHeader
 };

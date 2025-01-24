@@ -44,18 +44,16 @@ abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
   protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = input;
-
     if (typeof input !== "number") {
-      return new RadianteKDMInvalidStateError({ input, state, path: [] });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     if (input > CTRMemory.max(this.type)) {
-      return new RadianteKDMInvalidStateError({ input, state, path: [] });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     if (input < CTRMemory.min(this.type)) {
-      return new RadianteKDMInvalidStateError({ input, state, path: [] });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     return null;

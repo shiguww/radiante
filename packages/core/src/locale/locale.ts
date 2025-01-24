@@ -63,7 +63,7 @@ function normalizeLocaleCode(code: string): LocaleCode {
     case "us_spanish":
       return LocaleCode.US_SPANISH;
     default:
-      throw new RadianteInvalidLocaleCodeError({ code });
+      throw new RadianteInvalidLocaleCodeError(code);
   }
 }
 
@@ -127,7 +127,7 @@ function normalizeLocale(locale: string): Locale {
     case "us_spanish":
       return Locale.US_SPANISH;
     default:
-      throw new RadianteInvalidLocaleError({ locale });
+      throw new RadianteInvalidLocaleError(locale);
   }
 }
 

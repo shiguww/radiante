@@ -23,10 +23,7 @@ abstract class RadianteKDMPointer<S = unknown> extends KDMEntity<S> {
     const offset = ctx.pointers.get(this);
 
     if (offset === undefined) {
-      throw new RadianteKDMInvalidPointerError({
-        pointer: this,
-        instance: ctx.instance
-      });
+      throw new RadianteKDMInvalidPointerError(this);
     }
 
     this._resolve(ctx);

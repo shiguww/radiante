@@ -1,6 +1,6 @@
 import { CTRError } from "libctr";
 import type { CTRMemory } from "libctr";
-import type { RadianteKDM } from "#kdm/kdm";
+import type { RadianteKDM, RadianteKDMPartialHeader } from "#kdm/kdm";
 import type { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
 
 import type {
@@ -9,6 +9,9 @@ import type {
 } from "#kdm/common/kdm-entity";
 
 type RadianteKDMErrorCode =
+  | typeof RadianteKDMError.ERR_BUILD
+  | typeof RadianteKDMError.ERR_PARSE
+  | typeof RadianteKDMError.ERR_UNKNOWN
   | typeof RadianteKDMError.ERR_EMPTY_ARRAY
   | typeof RadianteKDMError.ERR_UNKNOWN_TYPE
   | typeof RadianteKDMError.ERR_INVALID_STATE
@@ -23,29 +26,15 @@ type RadianteKDMErrorCode =
   | typeof RadianteKDMError.ERR_INVALID_CONSTANT
   | typeof RadianteKDMError.ERR_INVALID_TABLE_COUNT
   | typeof RadianteKDMError.ERR_INVALID_PARAMETER_TYPE
+  | typeof RadianteKDMError.ERR_UNEXPECTED_END_OF_FILE
   | typeof RadianteKDMError.ERR_INVALID_PARAMETER_COUNT
   | typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION
   | typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION_COUNT;
 
-interface RadianteKDMErrorMetadata {
-  count?: number;
-  table?: string;
-  input?: unknown;
-  state?: unknown;
-  typeid?: number;
-  buffer?: CTRMemory;
-  instance?: RadianteKDM;
-  path?: (string | number)[];
-  array?: RadianteKDMEntity[];
-  pointer?: RadianteKDMPointer;
-  type?: RadianteKDMEntityConstructor;
-  entity?: RadianteKDMEntity | RadianteKDMEntity[];
-}
-
-abstract class RadianteKDMError<
-  C extends RadianteKDMErrorCode = RadianteKDMErrorCode,
-  M extends RadianteKDMErrorMetadata = RadianteKDMErrorMetadata
-> extends CTRError<C, M> {
+class RadianteKDMError extends CTRError {
+  public static readonly ERR_BUILD = "kdm.err_build";
+  public static readonly ERR_PARSE = "kdm.err_parse";
+  public static readonly ERR_UNKNOWN = "kdm.err_unknown";
   public static readonly ERR_EMPTY_ARRAY = "kdm.err_empty_array";
   public static readonly ERR_UNKNOWN_TYPE = "kdm.err_unknown_type";
   public static readonly ERR_INVALID_STATE = "kdm.err_invalid_state";
@@ -65,6 +54,9 @@ abstract class RadianteKDMError<
   public static readonly ERR_INVALID_PARAMETER_TYPE =
     "kdm.err_invalid_parameter_type";
 
+  public static readonly ERR_UNEXPECTED_END_OF_FILE =
+    "kdm.err_unexpected_end_of_file";
+
   public static readonly ERR_INVALID_PARAMETER_COUNT =
     "kdm.err_invalid_parameter_count";
 
@@ -73,216 +65,335 @@ abstract class RadianteKDMError<
 
   public static readonly ERR_INVALID_STRUCT_DEFINITION_COUNT =
     "kdm.err_invalid_struct_definition_count";
-}
 
-interface RadianteKDMFormatErrorMetadata extends RadianteKDMErrorMetadata {
-  buffer: CTRMemory;
-  instance: RadianteKDM;
-}
+  public override readonly code: RadianteKDMErrorCode;
 
-class RadianteKDMFormatError<
-  C extends RadianteKDMErrorCode = RadianteKDMErrorCode,
-  M extends RadianteKDMFormatErrorMetadata = RadianteKDMFormatErrorMetadata
-> extends RadianteKDMError<C, M> {}
-
-interface RadianteKDMEmptyArrayErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "array"> {}
-
-class RadianteKDMEmptyArrayError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_EMPTY_ARRAY,
-  RadianteKDMEmptyArrayErrorMetadata
-> {
   public constructor(
-    metadata: RadianteKDMEmptyArrayErrorMetadata,
+    code?: null | RadianteKDMErrorCode,
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_EMPTY_ARRAY, metadata, message, cause);
+    super(null, message, cause);
+    this.code = code || RadianteKDMError.ERR_UNKNOWN;
   }
 }
 
-interface RadianteKDMInvalidHeaderErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "buffer" | "instance"> {}
+//#region
+type RadianteKDMTypeErrorCode =
+  | typeof RadianteKDMError.ERR_UNKNOWN_TYPE
+  | typeof RadianteKDMError.ERR_INVALID_PARAMETER_TYPE;
 
-class RadianteKDMInvalidHeaderError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_INVALID_HEADER,
-  RadianteKDMInvalidHeaderErrorMetadata
-> {
+abstract class RadianteKDMTypeError extends RadianteKDMError {
+  public readonly type: RadianteKDMEntityConstructor;
+  public override readonly code: RadianteKDMTypeErrorCode;
+
   public constructor(
-    metadata: RadianteKDMInvalidHeaderErrorMetadata,
+    code: RadianteKDMTypeErrorCode,
+    type: RadianteKDMEntityConstructor,
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_INVALID_HEADER, metadata, message, cause);
+    super(null, message, cause);
+
+    this.code = code;
+    this.type = type;
   }
 }
 
-interface RadianteKDMInvalidPointerErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "pointer" | "instance"> {}
+class RadianteKDMUnknownTypeError extends RadianteKDMTypeError {
+  public override readonly code: typeof RadianteKDMError.ERR_UNKNOWN_TYPE;
 
-class RadianteKDMInvalidPointerError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_INVALID_POINTER,
-  RadianteKDMInvalidPointerErrorMetadata
-> {
   public constructor(
-    metadata: RadianteKDMInvalidPointerErrorMetadata,
+    type: RadianteKDMEntityConstructor,
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_INVALID_POINTER, metadata, message, cause);
+    super(RadianteKDMError.ERR_UNKNOWN_TYPE, type, message, cause);
+    this.code = RadianteKDMError.ERR_UNKNOWN_TYPE;
   }
 }
 
-interface RadianteKDMUnknownTypeErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "type" | "instance"> {}
+class RadianteKDMInvalidParameterTypeError extends RadianteKDMTypeError {
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_PARAMETER_TYPE;
 
-class RadianteKDMUnknownTypeError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_UNKNOWN_TYPE,
-  RadianteKDMUnknownTypeErrorMetadata
-> {
   public constructor(
-    metadata: RadianteKDMUnknownTypeErrorMetadata,
+    type: RadianteKDMEntityConstructor,
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_UNKNOWN_TYPE, metadata, message, cause);
+    super(RadianteKDMError.ERR_INVALID_PARAMETER_TYPE, type, message, cause);
+    this.code = RadianteKDMError.ERR_INVALID_PARAMETER_TYPE;
+  }
+}
+//#endregion
+
+//#region
+type RadianteKDMArrayErrorCode =
+  | typeof RadianteKDMError.ERR_EMPTY_ARRAY
+  | typeof RadianteKDMError.ERR_UNKNOWN_ARRAY;
+
+abstract class RadianteKDMArrayError extends RadianteKDMError {
+  public readonly array: RadianteKDMEntity[];
+  public override readonly code: RadianteKDMArrayErrorCode;
+
+  public constructor(
+    code: RadianteKDMArrayErrorCode,
+    array: RadianteKDMEntity[],
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.code = code;
+    this.array = array;
   }
 }
 
-interface RadianteKDMInvalidStateErrorMetadata
-  extends Pick<
-    Required<RadianteKDMErrorMetadata>,
-    "path" | "input" | "state"
-  > {}
+class RadianteKDMEmptyArrayError extends RadianteKDMArrayError {
+  public override readonly code: typeof RadianteKDMError.ERR_EMPTY_ARRAY;
 
-class RadianteKDMInvalidStateError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_INVALID_STATE,
-  RadianteKDMInvalidStateErrorMetadata
-> {
   public constructor(
-    metadata: RadianteKDMInvalidStateErrorMetadata,
+    array: RadianteKDMEntity[],
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_INVALID_STATE, metadata, message, cause);
+    super(RadianteKDMError.ERR_EMPTY_ARRAY, array, message, cause);
+    this.code = RadianteKDMError.ERR_EMPTY_ARRAY;
   }
 }
 
-interface RadianteKDMUnknownArrayErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "array" | "instance"> {}
+class RadianteKDMUnknownArrayError extends RadianteKDMArrayError {
+  public override readonly code: typeof RadianteKDMError.ERR_UNKNOWN_ARRAY;
 
-class RadianteKDMUnknownArrayError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_UNKNOWN_ARRAY,
-  RadianteKDMUnknownArrayErrorMetadata
-> {
   public constructor(
-    metadata: RadianteKDMUnknownArrayErrorMetadata,
+    array: RadianteKDMEntity[],
     message?: string,
     cause?: unknown
   ) {
-    super(RadianteKDMError.ERR_UNKNOWN_ARRAY, metadata, message, cause);
+    super(RadianteKDMError.ERR_UNKNOWN_ARRAY, array, message, cause);
+    this.code = RadianteKDMError.ERR_UNKNOWN_ARRAY;
+  }
+}
+//#endregion
+
+//#region
+type RadianteKDMFormatErrorCode =
+  | typeof RadianteKDMError.ERR_BUILD
+  | typeof RadianteKDMError.ERR_PARSE;
+
+class RadianteKDMFormatError extends RadianteKDMError {
+  public readonly buffer: CTRMemory;
+  public readonly instance: RadianteKDM;
+  public override readonly code: RadianteKDMFormatErrorCode;
+
+  public constructor(
+    code: RadianteKDMFormatErrorCode,
+    buffer: CTRMemory,
+    instance: RadianteKDM,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.code = code;
+    this.buffer = buffer;
+    this.instance = instance;
+  }
+}
+//#endregion
+
+//#region
+type RadianteKDMTypeIDErrorCode =
+  | typeof RadianteKDMError.ERR_UNKNOWN_TYPE_ID
+  | typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION;
+
+abstract class RadianteKDMTypeIDError extends RadianteKDMError {
+  public readonly typeid: number;
+  public override readonly code: RadianteKDMTypeIDErrorCode;
+
+  public constructor(
+    code: RadianteKDMTypeIDErrorCode,
+    typeid: number,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.code = code;
+    this.typeid = typeid;
   }
 }
 
-interface RadianteKDMUnknownTableErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "table" | "instance"> {}
+class RadianteKDMUnknownTypeIDError extends RadianteKDMTypeIDError {
+  public override readonly code: typeof RadianteKDMError.ERR_UNKNOWN_TYPE_ID;
 
-class RadianteKDMUnknownTableError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_UNKNOWN_TABLE,
-  RadianteKDMUnknownTableErrorMetadata
-> {
-  public constructor(
-    metadata: RadianteKDMUnknownTableErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(RadianteKDMError.ERR_UNKNOWN_TABLE, metadata, message, cause);
+  public constructor(typeid: number, message?: string, cause?: unknown) {
+    super(RadianteKDMError.ERR_UNKNOWN_TYPE_ID, typeid, message, cause);
+    this.code = RadianteKDMError.ERR_UNKNOWN_TYPE_ID;
   }
 }
 
-interface RadianteKDMUnknownEntityErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "entity" | "instance"> {}
+class RadianteKDMInvalidStructDefinitionError extends RadianteKDMTypeIDError {
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION;
 
-class RadianteKDMUnknownEntityError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_UNKNOWN_ENTITY,
-  RadianteKDMUnknownEntityErrorMetadata
-> {
-  public constructor(
-    metadata: RadianteKDMUnknownEntityErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(RadianteKDMError.ERR_UNKNOWN_ENTITY, metadata, message, cause);
-  }
-}
-
-interface RadianteKDMUnknownTypeIDErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "typeid" | "instance"> {}
-
-class RadianteKDMUnknownTypeIDError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_UNKNOWN_TYPE_ID,
-  RadianteKDMUnknownTypeIDErrorMetadata
-> {
-  public constructor(
-    metadata: RadianteKDMUnknownTypeIDErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(RadianteKDMError.ERR_UNKNOWN_TYPE_ID, metadata, message, cause);
-  }
-}
-
-interface RadianteKDMInvalidParameterTypeErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "type" | "instance"> {}
-
-class RadianteKDMInvalidParameterTypeError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_INVALID_PARAMETER_TYPE,
-  RadianteKDMInvalidParameterTypeErrorMetadata
-> {
-  public constructor(
-    metadata: RadianteKDMInvalidParameterTypeErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(
-      RadianteKDMError.ERR_INVALID_PARAMETER_TYPE,
-      metadata,
-      message,
-      cause
-    );
-  }
-}
-
-interface RadianteKDMInvalidStructDefinitionErrorMetadata
-  extends Pick<Required<RadianteKDMErrorMetadata>, "typeid" | "instance"> {}
-
-class RadianteKDMInvalidStructDefinitionError extends RadianteKDMError<
-  typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION,
-  RadianteKDMInvalidStructDefinitionErrorMetadata
-> {
-  public constructor(
-    metadata: RadianteKDMInvalidStructDefinitionErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
+  public constructor(typeid: number, message?: string, cause?: unknown) {
     super(
       RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION,
-      metadata,
+      typeid,
       message,
       cause
     );
+
+    this.code = RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION;
+  }
+}
+//#endregion
+
+//#region
+type RadianteKDMInvalidCountErrorCode =
+  | typeof RadianteKDMError.ERR_INVALID_TABLE_COUNT
+  | typeof RadianteKDMError.ERR_INVALID_PARAMETER_COUNT
+  | typeof RadianteKDMError.ERR_INVALID_STRUCT_DEFINITION_COUNT;
+
+class RadianteKDMInvalidCountError extends RadianteKDMError {
+  public readonly count: number;
+  public readonly expected: number;
+  public override readonly code: RadianteKDMInvalidCountErrorCode;
+
+  public constructor(
+    code: RadianteKDMInvalidCountErrorCode,
+    count: number,
+    expected: number,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.code = code;
+    this.count = count;
+    this.expected = expected;
+  }
+}
+//#endregion
+
+class RadianteKDMInvalidStateError extends RadianteKDMError {
+  public readonly input: unknown;
+  public readonly state: unknown;
+  public readonly path: (string | number)[];
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_STATE;
+
+  public constructor(
+    path: (string | number)[],
+    input: unknown,
+    state: unknown,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.path = path;
+    this.input = input;
+    this.state = state;
+    this.code = RadianteKDMError.ERR_INVALID_STATE;
+  }
+}
+
+class RadianteKDMUnknownTableError extends RadianteKDMError {
+  public readonly table: string;
+  public override readonly code: typeof RadianteKDMError.ERR_UNKNOWN_TABLE;
+
+  public constructor(table: string, message?: string, cause?: unknown) {
+    super(null, message, cause);
+
+    this.table = table;
+    this.code = RadianteKDMError.ERR_UNKNOWN_TABLE;
+  }
+}
+
+class RadianteKDMUnknownEntityError extends RadianteKDMError {
+  public readonly entity: RadianteKDMEntity | RadianteKDMEntity[];
+  public override readonly code: typeof RadianteKDMError.ERR_UNKNOWN_ENTITY;
+
+  public constructor(
+    entity: RadianteKDMEntity | RadianteKDMEntity[],
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.entity = entity;
+    this.code = RadianteKDMError.ERR_UNKNOWN_ENTITY;
+  }
+}
+
+class RadianteKDMInvalidHeaderError extends RadianteKDMError {
+  public readonly header: RadianteKDMPartialHeader;
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_HEADER;
+
+  public constructor(
+    header: RadianteKDMPartialHeader,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.header = header;
+    this.code = RadianteKDMError.ERR_INVALID_HEADER;
+  }
+}
+
+class RadianteKDMInvalidPointerError extends RadianteKDMError {
+  public readonly pointer: RadianteKDMPointer;
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_POINTER;
+
+  public constructor(
+    pointer: RadianteKDMPointer,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.pointer = pointer;
+    this.code = RadianteKDMError.ERR_INVALID_POINTER;
+  }
+}
+
+class RadianteKDMInvalidConstantError extends RadianteKDMError {
+  public readonly constant: number;
+  public readonly expected: number;
+  public override readonly code: typeof RadianteKDMError.ERR_INVALID_CONSTANT;
+
+  public constructor(
+    constant: number,
+    expected: number,
+    message?: string,
+    cause?: unknown
+  ) {
+    super(null, message, cause);
+
+    this.constant = constant;
+    this.expected = expected;
+    this.code = RadianteKDMError.ERR_INVALID_CONSTANT;
   }
 }
 
 export {
   RadianteKDMError,
   RadianteKDMError as KDMError,
+  RadianteKDMTypeError,
+  RadianteKDMTypeError as KDMTypeError,
+  RadianteKDMArrayError,
+  RadianteKDMArrayError as KDMArrayError,
+  RadianteKDMTypeIDError,
+  RadianteKDMTypeIDError as KDMTypeIDError,
   RadianteKDMFormatError,
   RadianteKDMFormatError as KDMFormatError,
   RadianteKDMEmptyArrayError,
   RadianteKDMEmptyArrayError as KDMEmptyArrayError,
   RadianteKDMUnknownTypeError,
   RadianteKDMUnknownTypeError as KDMUnknownTypeError,
+  RadianteKDMInvalidCountError,
+  RadianteKDMInvalidCountError as KDMInvalidCountError,
   RadianteKDMInvalidStateError,
   RadianteKDMInvalidStateError as KDMInvalidStateError,
   RadianteKDMUnknownArrayError,
@@ -297,6 +408,8 @@ export {
   RadianteKDMUnknownTypeIDError as KDMUnknownTypeIDError,
   RadianteKDMInvalidPointerError,
   RadianteKDMInvalidPointerError as KDMInvalidPointerError,
+  RadianteKDMInvalidConstantError,
+  RadianteKDMInvalidConstantError as KDMInvalidConstantError,
   RadianteKDMInvalidParameterTypeError,
   RadianteKDMInvalidParameterTypeError as KDMInvalidParameterTypeError,
   RadianteKDMInvalidStructDefinitionError,
@@ -306,30 +419,14 @@ export {
 export type {
   RadianteKDMErrorCode,
   RadianteKDMErrorCode as KDMErrorCode,
-  RadianteKDMErrorMetadata,
-  RadianteKDMErrorMetadata as KDMErrorMetadata,
-  RadianteKDMFormatErrorMetadata,
-  RadianteKDMFormatErrorMetadata as KDMFormatErrorMetadata,
-  RadianteKDMEmptyArrayErrorMetadata,
-  RadianteKDMEmptyArrayErrorMetadata as KDMEmptyArrayMetadata,
-  RadianteKDMUnknownTypeErrorMetadata,
-  RadianteKDMUnknownTypeErrorMetadata as KDMUnknownTypeMetadata,
-  RadianteKDMInvalidStateErrorMetadata,
-  RadianteKDMInvalidStateErrorMetadata as KDMInvalidStateMetadata,
-  RadianteKDMUnknownArrayErrorMetadata,
-  RadianteKDMUnknownArrayErrorMetadata as KDMUnknownArrayMetadata,
-  RadianteKDMUnknownTableErrorMetadata,
-  RadianteKDMUnknownTableErrorMetadata as KDMUnknownTableMetadata,
-  RadianteKDMInvalidHeaderErrorMetadata,
-  RadianteKDMInvalidHeaderErrorMetadata as KDMInvalidHeaderErrorMetadata,
-  RadianteKDMUnknownEntityErrorMetadata,
-  RadianteKDMUnknownEntityErrorMetadata as KDMUnknownEntityErrorMetadata,
-  RadianteKDMUnknownTypeIDErrorMetadata,
-  RadianteKDMUnknownTypeIDErrorMetadata as KDMUnknownTypeIDErrorMetadata,
-  RadianteKDMInvalidPointerErrorMetadata,
-  RadianteKDMInvalidPointerErrorMetadata as KDMInvalidPointerErrorMetadata,
-  RadianteKDMInvalidParameterTypeErrorMetadata,
-  RadianteKDMInvalidParameterTypeErrorMetadata as KDMInvalidParameterTypeErrorMetadata,
-  RadianteKDMInvalidStructDefinitionErrorMetadata,
-  RadianteKDMInvalidStructDefinitionErrorMetadata as KDMInvalidStructDefinitionErrorMetadata
+  RadianteKDMTypeErrorCode,
+  RadianteKDMTypeErrorCode as KDMTypeErrorCode,
+  RadianteKDMArrayErrorCode,
+  RadianteKDMArrayErrorCode as KDMArrayErrorCode,
+  RadianteKDMFormatErrorCode,
+  RadianteKDMFormatErrorCode as KDMFormatErrorCode,
+  RadianteKDMTypeIDErrorCode,
+  RadianteKDMTypeIDErrorCode as KDMTypeIDErrorCode,
+  RadianteKDMInvalidCountErrorCode,
+  RadianteKDMInvalidCountErrorCode as KDMInvalidCountErrorCode
 };

@@ -47,10 +47,8 @@ abstract class RadianteKDMBaseParameter<
   protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = input;
-
     if (input === null || typeof input !== "object") {
-      return new RadianteKDMInvalidStateError({ input, state, path: [] });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     let err: null | RadianteKDMInvalidStateError;

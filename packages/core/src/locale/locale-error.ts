@@ -1,71 +1,50 @@
 import { CTRError } from "libctr";
 
 type RadianteLocaleErrorCode =
+  | typeof RadianteLocaleError.ERR_UNKNOWN
   | typeof RadianteLocaleError.ERR_INVALID_LOCALE
   | typeof RadianteLocaleError.ERR_INVALID_LOCALE_CODE;
 
-interface RadianteLocaleErrorMetadata {
-  code?: string;
-  locale?: string;
-}
-
-abstract class RadianteLocaleError<
-  C extends RadianteLocaleErrorCode,
-  M extends RadianteLocaleErrorMetadata
-> extends CTRError<C, M> {
+class RadianteLocaleError extends CTRError {
+  public static readonly ERR_UNKNOWN = "locale.err_unknown";
   public static readonly ERR_INVALID_LOCALE = "locale.err_invalid_locale";
 
   public static readonly ERR_INVALID_LOCALE_CODE =
     "locale.err_invalid_locale_code";
-}
 
-interface RadianteInvalidLocaleErrorMetadata
-  extends Pick<Required<RadianteLocaleErrorMetadata>, "locale"> {}
-
-class RadianteInvalidLocaleError extends RadianteLocaleError<
-  typeof RadianteLocaleError.ERR_INVALID_LOCALE,
-  RadianteInvalidLocaleErrorMetadata
-> {
-  public static is(err: unknown): err is RadianteInvalidLocaleError {
-    return err instanceof RadianteInvalidLocaleError;
-  }
+  public override readonly code: RadianteLocaleErrorCode;
 
   public constructor(
-    metadata: RadianteInvalidLocaleErrorMetadata,
+    code?: null | RadianteLocaleErrorCode,
     message?: string,
     cause?: unknown
   ) {
-    super(
-      RadianteLocaleError.ERR_INVALID_LOCALE,
-      metadata,
-      message || `Invalid locale '${metadata.locale}'`,
-      cause
-    );
+    super(null, message, cause);
+    this.code = code || RadianteLocaleError.ERR_UNKNOWN;
   }
 }
 
-interface RadianteInvalidLocaleCodeErrorMetadata
-  extends Pick<Required<RadianteLocaleErrorMetadata>, "code"> {}
+class RadianteInvalidLocaleError extends RadianteLocaleError {
+  public readonly locale: string;
+  public override readonly code: typeof RadianteLocaleError.ERR_INVALID_LOCALE;
 
-class RadianteInvalidLocaleCodeError extends RadianteLocaleError<
-  typeof RadianteLocaleError.ERR_INVALID_LOCALE_CODE,
-  RadianteInvalidLocaleCodeErrorMetadata
-> {
-  public static is(err: unknown): err is RadianteInvalidLocaleCodeError {
-    return err instanceof RadianteInvalidLocaleCodeError;
+  public constructor(locale: string, message?: string, cause?: unknown) {
+    super(null, message || `invalid locale '${locale}'`, cause);
+
+    this.locale = locale;
+    this.code = RadianteLocaleError.ERR_INVALID_LOCALE;
   }
+}
 
-  public constructor(
-    metadata: RadianteInvalidLocaleCodeErrorMetadata,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(
-      RadianteLocaleError.ERR_INVALID_LOCALE_CODE,
-      metadata,
-      message || `Invalid locale code '${metadata.code}'`,
-      cause
-    );
+class RadianteInvalidLocaleCodeError extends RadianteLocaleError {
+  public readonly localecode: string;
+  public override readonly code: typeof RadianteLocaleError.ERR_INVALID_LOCALE_CODE;
+
+  public constructor(localecode: string, message?: string, cause?: unknown) {
+    super(null, message || `invalid locale code '${localecode}'`, cause);
+
+    this.localecode = localecode;
+    this.code = RadianteLocaleError.ERR_INVALID_LOCALE_CODE;
   }
 }
 
@@ -80,11 +59,5 @@ export {
 
 export type {
   RadianteLocaleErrorCode,
-  RadianteLocaleErrorCode as LocaleErrorCode,
-  RadianteLocaleErrorMetadata,
-  RadianteLocaleErrorMetadata as LocaleErrorMetadata,
-  RadianteInvalidLocaleErrorMetadata,
-  RadianteInvalidLocaleErrorMetadata as InvalidLocaleErrorMetadata,
-  RadianteInvalidLocaleCodeErrorMetadata,
-  RadianteInvalidLocaleCodeErrorMetadata as InvalidLocaleCodeErrorMetadata
+  RadianteLocaleErrorCode as LocaleErrorCode
 };

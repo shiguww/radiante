@@ -1,16 +1,11 @@
 import { CTRMemory } from "libctr";
 import { RadianteKDMEntity } from "#kdm/common/kdm-entity";
+import { RadianteKDMError, RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
-
-import {
-  RadianteKDMError,
-  RadianteKDMFormatError,
-  RadianteKDMInvalidStateError
-} from "#kdm/kdm-error";
 
 class RadianteKDMString extends RadianteKDMEntity<string> {
   public static bytelength(string: string): number {
@@ -65,10 +60,7 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
 
     while (buffer.offset % 4 !== 0) {
       if (buffer.u8() !== 0x00) {
-        throw new RadianteKDMFormatError(RadianteKDMError.ERR_MALFORMED_FILE, {
-          buffer,
-          instance: ctx.instance
-        });
+        throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
     }
 
@@ -85,14 +77,8 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
   protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = input;
-
     if (typeof input !== "string") {
-      return new RadianteKDMInvalidStateError({
-        input,
-        state,
-        path: []
-      });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     return null;

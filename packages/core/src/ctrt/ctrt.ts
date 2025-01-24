@@ -1,5 +1,10 @@
 import { PNG } from "pngjs";
-import { CTRMemory, CTRMemoryOOBError, CTRBinarySerializable } from "libctr";
+import {
+  CTRMemory,
+  CTRMemoryOOBError,
+  CTRBinarySerializable,
+  CTREventEmitterDefaultEventMap
+} from "libctr";
 
 import {
   RadianteCTRTError,
@@ -20,7 +25,14 @@ interface RadianteCTRTToPNGOptions {
   write?: boolean;
 }
 
-class RadianteCTRT extends CTRBinarySerializable {
+class RadianteCTRT extends CTRBinarySerializable<
+  never,
+  CTREventEmitterDefaultEventMap,
+  undefined,
+  undefined,
+  RadianteCTRTFormatError,
+  RadianteCTRTFormatError
+> {
   private static readonly MAGIC = [0x43, 0x54, 0x52, 0x54];
 
   private static readonly TYPE_RGB565 = 8;
@@ -36,10 +48,7 @@ class RadianteCTRT extends CTRBinarySerializable {
       case RadianteCTRT.TYPE_RGB888:
         return "RGB888";
       default:
-        throw new RadianteCTRTUnrecognizedTypeError({
-          texture: this,
-          type: this._type
-        });
+        throw new RadianteCTRTUnrecognizedTypeError(this, this._type);
     }
   }
 
@@ -52,7 +61,7 @@ class RadianteCTRT extends CTRBinarySerializable {
         this._type = RadianteCTRT.TYPE_RGB888;
         break;
       default:
-        throw new RadianteCTRTUnrecognizedTypeError({ texture: this, type });
+        throw new RadianteCTRTUnrecognizedTypeError(this, type);
     }
   }
 
@@ -63,10 +72,7 @@ class RadianteCTRT extends CTRBinarySerializable {
       case "RGB888":
         return 32;
       default:
-        throw new RadianteCTRTUnrecognizedTypeError({
-          texture: this,
-          type: this.type
-        });
+        return NaN;
     }
   }
 
@@ -115,22 +121,10 @@ class RadianteCTRT extends CTRBinarySerializable {
 
   protected override _build(buffer: CTRMemory): void {
     buffer.endianness = "LE";
-    let type: RadianteCTRTType;
 
-    try {
-      type = this.type;
-    } catch (err) {
-      throw new RadianteCTRTFormatError(
-        RadianteCTRTError.ERR_UNRECOGNIZED_TYPE,
-        { texture: this, buffer },
-        undefined,
-        err
-      );
-    }
-
-    if (type === "RGB565") {
+    if (this.type === "RGB565") {
       this._buildRGB565(buffer);
-    } else if (type === "RGB888") {
+    } else if (this.type === "RGB888") {
       this._buildRGB888(buffer);
     }
 
@@ -178,22 +172,13 @@ class RadianteCTRT extends CTRBinarySerializable {
     buffer.endianness = "LE";
 
     if (buffer.length < 16) {
-      throw new RadianteCTRTFormatError(
-        RadianteCTRTError.ERR_BUFFER_TOO_SMALL,
-        {
-          buffer,
-          texture: this
-        }
-      );
+      throw new RadianteCTRTError(RadianteCTRTError.ERR_BUFFER_TOO_SMALL, this);
     }
 
     buffer.seek(-16);
 
     if (!buffer.raw({ count: 4 }).equals(RadianteCTRT.MAGIC)) {
-      throw new RadianteCTRTFormatError(RadianteCTRTError.ERR_NOT_A_CTRT_FILE, {
-        buffer,
-        texture: this
-      });
+      throw new RadianteCTRTError(RadianteCTRTError.ERR_NOT_A_CTRT_FILE, this);
     }
 
     const width = buffer.u16();
@@ -202,54 +187,43 @@ class RadianteCTRT extends CTRBinarySerializable {
 
     buffer.seek(0);
 
-    let type: RadianteCTRTType;
-
-    try {
-      type = this.type;
-    } catch (err) {
-      throw new RadianteCTRTFormatError(
-        RadianteCTRTError.ERR_UNRECOGNIZED_TYPE,
-        { buffer, texture: this },
-        undefined,
-        err
-      );
-    }
-
-    if (type === "RGB565") {
+    if (this.type === "RGB565") {
       this._parseRGB565(buffer, width, height);
-    } else if (type === "RGB888") {
+    } else if (this.type === "RGB888") {
       this._parseRGB888(buffer, width, height);
     }
   }
 
-  protected override _builderr(err: unknown, buffer: CTRMemory): never {
-    throw new RadianteCTRTError(
-      RadianteCTRTError.ERR_UNKNOWN,
-      { buffer, texture: this },
+  protected override _builderr(
+    err: unknown,
+    buffer: CTRMemory
+  ): RadianteCTRTFormatError {
+    return new RadianteCTRTFormatError(
+      RadianteCTRTError.ERR_BUILD,
+      buffer,
+      this,
       undefined,
       err
     );
   }
 
-  protected override _parseerr(err: unknown, buffer: CTRMemory): never {
-    if (err instanceof RadianteCTRTError) {
-      throw err;
-    }
-
-    if (err instanceof CTRMemoryOOBError) {
-      throw new RadianteCTRTError(
-        RadianteCTRTError.ERR_UNEXPECTED_END_OF_FILE,
-        { buffer, texture: this },
-        undefined,
-        err
-      );
-    }
-
-    throw new RadianteCTRTError(
-      RadianteCTRTError.ERR_UNKNOWN,
-      { buffer, texture: this },
+  protected override _parseerr(
+    err: unknown,
+    buffer: CTRMemory
+  ): RadianteCTRTFormatError {
+    return new RadianteCTRTFormatError(
+      RadianteCTRTError.ERR_PARSE,
+      buffer,
+      this,
       undefined,
-      err
+      err instanceof CTRMemoryOOBError
+        ? new RadianteCTRTError(
+            RadianteCTRTError.ERR_UNEXPECTED_END_OF_FILE,
+            this,
+            undefined,
+            err
+          )
+        : err
     );
   }
 

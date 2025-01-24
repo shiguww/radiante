@@ -33,7 +33,7 @@ class RadianteKDMStructArrayPointer<
 
     if (array !== null && array !== undefined) {
       if (array[0] === undefined) {
-        throw new KDMEmptyArrayError({ array });
+        throw new KDMEmptyArrayError(array);
       }
 
       this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
@@ -65,10 +65,7 @@ class RadianteKDMStructArrayPointer<
     const offset = ctx.instance.arrays.get(this._array);
 
     if (offset === undefined) {
-      throw new RadianteKDMUnknownArrayError({
-        array: this._array,
-        instance: ctx.instance
-      });
+      throw new RadianteKDMUnknownArrayError(this._array);
     }
 
     this._pointer = offset;
@@ -83,16 +80,13 @@ class RadianteKDMStructArrayPointer<
     const array = ctx.arrays.get(this._pointer);
 
     if (array === undefined) {
-      throw new RadianteKDMInvalidPointerError({
-        pointer: this,
-        instance: ctx.instance
-      });
+      throw new RadianteKDMInvalidPointerError(this);
     }
 
     this._array = <S[]>array;
 
     if (array[0] === undefined) {
-      throw new KDMEmptyArrayError({ array });
+      throw new KDMEmptyArrayError(array);
     }
 
     this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
@@ -101,18 +95,12 @@ class RadianteKDMStructArrayPointer<
   protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = input;
-
     if (input === null) {
       return null;
     }
 
     if (this._struct === null) {
-      return new RadianteKDMInvalidStateError({
-        input,
-        state,
-        path: []
-      });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     return _validateArray(input, input, [], new this._struct());

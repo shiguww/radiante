@@ -35,14 +35,8 @@ class RadianteKDMStringPointer extends RadianteKDMPointer<null | string> {
   protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    const state = input;
-
     if (input !== null && typeof input !== "string") {
-      return new RadianteKDMInvalidStateError({
-        input,
-        state,
-        path: []
-      });
+      return new RadianteKDMInvalidStateError([], input, input);
     }
 
     return null;

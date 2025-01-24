@@ -16,8 +16,9 @@ abstract class RadianteKDMEntity<T = unknown> extends CTRBinarySerializable<
   CTREventEmitterEventMap,
   RadianteKDMBuildContext,
   RadianteKDMParseContext,
-  null,
-  null
+  Error,
+  Error,
+  RadianteKDMInvalidStateError
 > {
   public get _type(): RadianteKDMEntityConstructor<T> {
     return <RadianteKDMEntityConstructor<T>>this.constructor;

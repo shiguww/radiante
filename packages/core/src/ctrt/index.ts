@@ -8,7 +8,5 @@ export {
 
 export type {
   RadianteCTRTErrorCode as ErrorCode,
-  RadianteCTRTErrorMetadata as ErrorMetadata,
-  RadianteCTRTFormatErrorMetadata as FormatErrorMetadata,
-  RadianteCTRTUnrecognizedTypeErrorMetadata as UnrecognizedTypeErrorMetadata
+  RadianteCTRTFormatErrorCode as FormatErrorCode
 } from "#ctrt/ctrt-error";

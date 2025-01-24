@@ -106,7 +106,7 @@ abstract class RadianteKDMStruct<
     const state: unknown = input;
 
     if (input === null || typeof input !== "object") {
-      return new RadianteKDMInvalidStateError({ input, state, path: [] });
+      return new RadianteKDMInvalidStateError([], input, state);
     }
 
     for (const [key, field] of this._definition) {

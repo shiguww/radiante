@@ -25,9 +25,4 @@ export {
   RadianteInvalidLocaleCodeError as InvalidLocaleCodeError
 } from "#locale/locale-error";
 
-export type {
-  RadianteLocaleErrorCode as ErrorCode,
-  RadianteLocaleErrorMetadata as ErrorMetadata,
-  RadianteInvalidLocaleErrorMetadata as InvalidLocaleErrorMetadata,
-  RadianteInvalidLocaleCodeErrorMetadata as InvalidLocaleCodeErrorMetadata
-} from "#locale/locale-error";
+export type { RadianteLocaleErrorCode as ErrorCode } from "#locale/locale-error";

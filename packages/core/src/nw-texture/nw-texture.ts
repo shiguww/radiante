@@ -91,17 +91,11 @@ function _decode(
 
   for (const item of items) {
     if (data.offset !== item.dataOffset) {
-      throw new NWTextureError(NWTextureError.ERR_MALFORMED_DATA, {
-        data,
-        info
-      });
+      throw new NWTextureError(NWTextureError.ERR_MALFORMED_DATA, data, info);
     }
 
     if (info.offset !== nameStart + item.nameOffset) {
-      throw new NWTextureError(NWTextureError.ERR_MALFORMED_INFO, {
-        data,
-        info
-      });
+      throw new NWTextureError(NWTextureError.ERR_MALFORMED_INFO, data, info);
     }
 
     const file = root.file(
