@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "libctr": "^2.1.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "libctr": "^3.0.0"
   },
   "devDependencies": {
     "tsup": "catalog:",
