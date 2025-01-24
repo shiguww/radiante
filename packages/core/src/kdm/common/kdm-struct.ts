@@ -1,19 +1,28 @@
+import z from "zod";
 import { CTRMemory } from "libctr";
+import type { ZodType } from "zod";
 import type { CTRMemoryArray } from "libctr";
-import { KDMEntity } from "#kdm/common/kdm-entity";
+import { KDMEntity, RadianteKDMEntity } from "#kdm/common/kdm-entity";
 import { RadianteKDMStringPointer } from "#kdm/common/primitive/kdm-string-pointer";
 
 import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 type RadianteKDMStructConstructor<
   T extends RadianteKDMStructDefinition = RadianteKDMStructDefinition
 > = new () => RadianteKDMStruct<string, T>;
 
-interface RadianteKDMStructDefinition extends Array<[string, KDMEntity<any>]> {}
+interface RadianteKDMStructDefinition
+  extends ReadonlyArray<readonly [string, KDMEntity<any>]> {}
+
+type RadianteKDMStructData<S extends RadianteKDMStruct = RadianteKDMStruct> =
+  S extends RadianteKDMStruct<infer _, infer T>
+    ? {
+        [K in T[number] as K[0]]: K[1];
+      }
+    : never;
 
 type RadianteKDMStructObject<S extends RadianteKDMStruct = RadianteKDMStruct> =
   S extends RadianteKDMStruct<infer N, infer T>
@@ -48,19 +57,52 @@ abstract class RadianteKDMStruct<
     }
   }
 
+  public get data(): RadianteKDMStructData<RadianteKDMStruct<N, T>> {
+    return <RadianteKDMStructData<RadianteKDMStruct<N, T>>>(
+      (<unknown>(
+        Object.fromEntries(this._definition.map(([key, field]) => [key, field]))
+      ))
+    );
+  }
+
   public get fields(): T[number][1][] {
     return this._definition.map(([, field]) => field);
   }
 
   public get struct(): RadianteKDMStructObject<RadianteKDMStruct<N, T>> {
-    return Object.assign(
-      Object.create(null),
-      Object.fromEntries(
-        this._definition.map(([key, field]) => [key, field.get()])
-      ),
-      {
-        entity: this._name
-      }
+    return <RadianteKDMStructObject<RadianteKDMStruct<N, T>>>(
+      (<unknown>Object.assign(
+        Object.fromEntries(
+          Object.entries(this.data).map(([key, field]) =>
+            field instanceof RadianteKDMEntity
+              ? [key, field.get()]
+              : [Symbol(), field]
+          )
+        ),
+        {
+          entity: this._name
+        }
+      ))
+    );
+  }
+
+  public override get schema(): ZodType<
+    RadianteKDMStructObject<RadianteKDMStruct<N, T>>
+  > {
+    return <ZodType<RadianteKDMStructObject<RadianteKDMStruct<N, T>>>>(
+      (<unknown>(
+        z.object(
+          <any>(
+            Object.fromEntries(
+              Object.entries(this.data).map(([key, field]) =>
+                field instanceof RadianteKDMEntity
+                  ? [key, field.schema]
+                  : [Symbol(), field]
+              )
+            )
+          )
+        )
+      ))
     );
   }
 
@@ -98,26 +140,6 @@ abstract class RadianteKDMStruct<
     return this.fields
       .map((f) => f.sizeof)
       .reduce((prev, curr) => prev + curr, 0);
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    const state: unknown = input;
-
-    if (input === null || typeof input !== "object") {
-      return new RadianteKDMInvalidStateError([], input, state);
-    }
-
-    for (const [key, field] of this._definition) {
-      const err = field._validateAt(input, Reflect.get(input, key), [key]);
-
-      if (err !== null) {
-        return err;
-      }
-    }
-
-    return null;
   }
 }
 

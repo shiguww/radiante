@@ -1,4 +1,5 @@
 import { CTRError } from "libctr";
+import type { ZodError } from "zod";
 import type { CTRMemory } from "libctr";
 import type { RadianteKDM, RadianteKDMPartialHeader } from "#kdm/kdm";
 import type { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
@@ -277,23 +278,15 @@ class RadianteKDMInvalidCountError extends RadianteKDMError {
 //#endregion
 
 class RadianteKDMInvalidStateError extends RadianteKDMError {
-  public readonly input: unknown;
-  public readonly state: unknown;
-  public readonly path: (string | number)[];
+  public readonly err: ZodError;
+  public override readonly cause: ZodError;
   public override readonly code: typeof RadianteKDMError.ERR_INVALID_STATE;
 
-  public constructor(
-    path: (string | number)[],
-    input: unknown,
-    state: unknown,
-    message?: string,
-    cause?: unknown
-  ) {
-    super(null, message, cause);
+  public constructor(err: ZodError, message?: string) {
+    super(null, message, err);
 
-    this.path = path;
-    this.input = input;
-    this.state = state;
+    this.err = err;
+    this.cause = err;
     this.code = RadianteKDMError.ERR_INVALID_STATE;
   }
 }

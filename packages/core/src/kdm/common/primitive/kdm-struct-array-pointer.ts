@@ -1,4 +1,5 @@
-import { _validateArray } from "#kdm/kdm-utils";
+import z from "zod";
+import type { ZodType } from "zod";
 import { RadianteKDMStruct } from "#kdm/common/kdm-struct";
 import type { RadianteKDMStructObject } from "#kdm/common/kdm-struct";
 import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
@@ -10,9 +11,8 @@ import type {
 
 import {
   KDMEmptyArrayError,
-  RadianteKDMInvalidPointerError,
-  RadianteKDMInvalidStateError,
-  RadianteKDMUnknownArrayError
+  RadianteKDMUnknownArrayError,
+  RadianteKDMInvalidPointerError
 } from "#kdm/kdm-error";
 
 type RadianteKDMStructConstructor<
@@ -46,6 +46,18 @@ class RadianteKDMStructArrayPointer<
 
   public get first(): S | null {
     return this._array?.[0] || null;
+  }
+
+  public override get schema(): ZodType<null | RadianteKDMStructObject<S>[]> {
+    if (this._struct === null) {
+      return z.null();
+    }
+
+    const instance = new this._struct();
+    
+    return <ZodType<null | RadianteKDMStructObject<S>[]>>(
+      instance.schema.array().nullable()
+    );
   }
 
   protected override _get(): null | RadianteKDMStructObject<S>[] {
@@ -90,20 +102,6 @@ class RadianteKDMStructArrayPointer<
     }
 
     this._struct = <RadianteKDMStructConstructor<S>>array[0]._type;
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    if (input === null) {
-      return null;
-    }
-
-    if (this._struct === null) {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    return _validateArray(input, input, [], new this._struct());
   }
 }
 

@@ -1,6 +1,8 @@
+import z from "zod";
 import { CTRMemory } from "libctr";
+import type { ZodString } from "zod";
+import { RadianteKDMError } from "#kdm/kdm-error";
 import { RadianteKDMEntity } from "#kdm/common/kdm-entity";
-import { RadianteKDMError, RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 import type {
   RadianteKDMBuildContext,
@@ -8,6 +10,8 @@ import type {
 } from "#kdm/kdm";
 
 class RadianteKDMString extends RadianteKDMEntity<string> {
+  public static readonly schema: ZodString = z.string();
+
   public static bytelength(string: string): number {
     return Math.ceil(CTRMemory.bytelength(string + "\0", "utf8") / 4) * 4;
   }
@@ -25,6 +29,10 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
 
   public get string(): string {
     return this._string;
+  }
+
+  public override get schema(): ZodString {
+    return RadianteKDMString.schema;
   }
 
   protected override _get(): string {
@@ -72,16 +80,6 @@ class RadianteKDMString extends RadianteKDMEntity<string> {
 
   protected override _sizeof(): number {
     return RadianteKDMString.bytelength(this._string);
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    if (typeof input !== "string") {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    return null;
   }
 }
 

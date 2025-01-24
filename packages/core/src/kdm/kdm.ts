@@ -1,6 +1,7 @@
+import type { ZodType } from "zod";
 import { RadianteKDMF32 } from "#kdm/common/primitive/kdm-f32";
 import { RadianteKDMI32 } from "#kdm/common/primitive/kdm-i32";
-import type { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
+import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMString } from "#kdm/common/primitive/kdm-string";
 import type { RadianteKDMStructConstructor } from "#kdm/common/kdm-struct";
 import type { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
@@ -96,13 +97,14 @@ interface RadianteKDMPartialHeader {
   sections?: number[];
 }
 
-abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
-  S,
+abstract class RadianteKDM<T = unknown> extends CTRBinarySerializable<
+  T,
   CTREventEmitterDefaultEventMap,
   undefined,
   undefined,
   RadianteKDMFormatError,
-  RadianteKDMFormatError
+  RadianteKDMFormatError,
+  RadianteKDMInvalidStateError
 > {
   private static readonly SECTION_COUNT = 8;
   private static readonly HEADER_SIZE = 0x28;
@@ -145,13 +147,11 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
     ]);
   }
 
+  public abstract get schema(): ZodType<T>;
+
   public get types(): Map<number, RadianteKDMEntityConstructor> {
     return new Map([...this.structs, ...this.primitives]);
   }
-
-  protected abstract override _validate(
-    state: unknown
-  ): null | RadianteKDMInvalidStateError;
 
   protected override _build(buffer: CTRMemory): void {
     buffer.encoding = "utf8";
@@ -283,6 +283,18 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
           )
         : err
     );
+  }
+
+  protected override _validate(
+    input: unknown
+  ): null | RadianteKDMInvalidStateError {
+    const result = this.schema.safeParse(input);
+
+    if (result.error !== undefined) {
+      return new RadianteKDMInvalidStateError(result.error);
+    }
+
+    return null;
   }
 
   protected _addString(
@@ -568,7 +580,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
         this.constant = constant;
       }
 
-      if (last && constant !== 0) {
+      if (last && parameter.unknown0.number !== 0) {
         throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
 
@@ -762,7 +774,7 @@ abstract class RadianteKDM<S = unknown> extends CTRBinarySerializable<
       string.dereference(ctx);
 
       if (string.string === null) {
-        throw "kdm.err_invalid_table_name";
+        throw new RadianteKDMError(RadianteKDMError.ERR_MALFORMED_FILE);
       }
 
       names.push(string.string);

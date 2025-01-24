@@ -1,4 +1,5 @@
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
+import z from "zod";
+import type { ZodType } from "zod";
 import { RadianteKDMPointer } from "#kdm/common/primitive/kdm-pointer";
 
 import type {
@@ -7,6 +8,11 @@ import type {
 } from "#kdm/kdm";
 
 class RadianteKDMStringPointer extends RadianteKDMPointer<null | string> {
+  public static readonly schema: ZodType<null | string> = z
+    .string()
+    .nullable()
+    .transform((s) => (typeof s === "string" && s.length === 0 ? null : s));
+
   public string: null | string;
 
   public constructor(string?: string) {
@@ -17,6 +23,10 @@ class RadianteKDMStringPointer extends RadianteKDMPointer<null | string> {
     if (string !== undefined) {
       this.set(string);
     }
+  }
+
+  public override get schema(): ZodType<null | string> {
+    return RadianteKDMStringPointer.schema;
   }
 
   protected override _get(): null | string {
@@ -30,16 +40,6 @@ class RadianteKDMStringPointer extends RadianteKDMPointer<null | string> {
   protected override _resolve(ctx: RadianteKDMBuildContext): void {
     this._pointer =
       this.string === null ? 0 : ctx.instance.strings.get(this.string) || 0;
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    if (input !== null && typeof input !== "string") {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    return null;
   }
 
   protected override _dereference(ctx: RadianteKDMParseContext): void {

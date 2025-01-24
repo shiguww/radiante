@@ -1,4 +1,4 @@
-import { _validateAt } from "#kdm/kdm-utils";
+import type { ZodType } from "zod";
 import { CTRBinarySerializable } from "libctr";
 import type { CTREventEmitterEventMap } from "libctr";
 import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
@@ -20,6 +20,8 @@ abstract class RadianteKDMEntity<T = unknown> extends CTRBinarySerializable<
   Error,
   RadianteKDMInvalidStateError
 > {
+  public abstract get schema(): ZodType<T>;
+
   public get _type(): RadianteKDMEntityConstructor<T> {
     return <RadianteKDMEntityConstructor<T>>this.constructor;
   }
@@ -28,22 +30,16 @@ abstract class RadianteKDMEntity<T = unknown> extends CTRBinarySerializable<
     return [];
   }
 
-  public override validate(
+  protected override _validate(
     input: unknown
   ): null | RadianteKDMInvalidStateError {
-    return this._validate(input);
-  }
+    const result = this.schema.safeParse(input);
 
-  protected abstract override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError;
+    if (result.error !== undefined) {
+      return new RadianteKDMInvalidStateError(result.error);
+    }
 
-  public _validateAt(
-    input: unknown,
-    state: unknown,
-    path: (string | number)[]
-  ): null | RadianteKDMInvalidStateError {
-    return _validateAt(input, state, path, this);
+    return null;
   }
 }
 

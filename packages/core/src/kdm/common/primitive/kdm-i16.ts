@@ -1,6 +1,6 @@
-import { RadianteKDMNumber } from "#kdm/common/primitive/kdm-number";
+import { RadianteKDMInt } from "#kdm/common/primitive/kdm-int";
 
-class RadianteKDMI16 extends RadianteKDMNumber {
+class RadianteKDMI16 extends RadianteKDMInt {
   public constructor(number?: number) {
     super("i16", number);
   }

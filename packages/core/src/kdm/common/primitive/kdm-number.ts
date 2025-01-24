@@ -1,14 +1,15 @@
+import z from "zod";
 import { CTRMemory } from "libctr";
+import type { ZodNumber } from "zod";
 import type { CTRMemoryDataType } from "libctr";
 import { RadianteKDMEntity } from "#kdm/common/kdm-entity";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 type RadianteKDMNumberType = CTRMemoryDataType &
   `${"i" | "u" | "f"}${"8" | "16" | "32"}`;
 
 abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
   public number: number;
-  public type: RadianteKDMNumberType;
+  public readonly type: RadianteKDMNumberType;
 
   public constructor(type: RadianteKDMNumberType, number?: number) {
     super();
@@ -19,6 +20,13 @@ abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
     if (number !== undefined) {
       this.set(number);
     }
+  }
+
+  public override get schema(): ZodNumber {
+    return z
+      .number()
+      .max(Number(CTRMemory.max(this.type)))
+      .min(Number(CTRMemory.min(this.type)));
   }
 
   protected override _get(): number {
@@ -39,24 +47,6 @@ abstract class RadianteKDMNumber extends RadianteKDMEntity<number> {
 
   protected override _sizeof(): number {
     return CTRMemory.sizeof(this.type);
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    if (typeof input !== "number") {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    if (input > CTRMemory.max(this.type)) {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    if (input < CTRMemory.min(this.type)) {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    return null;
   }
 }
 

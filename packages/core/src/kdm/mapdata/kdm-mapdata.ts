@@ -1,8 +1,9 @@
+import z from "zod";
+import type { ZodType } from "zod";
 import { CTRMemory } from "libctr";
 import { RadianteKDM } from "#kdm/kdm";
 import type { CTRMemoryArray } from "libctr";
 import { _lexicographicalSorting } from "#utils";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 import { RadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import type { IRadianteKDMMapData0x15 } from "#kdm/mapdata/mapdata0x15";
 import { RadianteKDMI32Parameter } from "#kdm/common/parameter/kdm-i32-parameter";
@@ -15,6 +16,11 @@ interface IRadianteKDMMapData {
 }
 
 class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
+  public static readonly schema: ZodType<IRadianteKDMMapData> = z.object({
+    map_data_table: z.string().array(),
+    maps: RadianteKDMMapData0x15.schema.array()
+  });
+
   private static readonly MAP_DATA_TABLE = "mapDataTable";
   private static readonly MAP_DATA_TABLE_LEN = "mapDataTableLen";
 
@@ -48,6 +54,10 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
     }
   }
 
+  public override get schema(): ZodType<IRadianteKDMMapData> {
+    return RadianteKDMMapData.schema;
+  }
+
   protected override _get(): IRadianteKDMMapData {
     const maps = Array.from(this.arrays.keys())
       .filter((arr) => arr.every((e) => e instanceof RadianteKDMMapData0x15))
@@ -58,7 +68,7 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
       .map((p) => p.array?.[0]?.struct.unknown0 || null)
       .filter((m) => m !== null);
 
-    return { maps, map_data_table };
+      return { maps, map_data_table };
   }
 
   protected override _set(state: IRadianteKDMMapData): void {
@@ -105,12 +115,6 @@ class RadianteKDMMapData extends RadianteKDM<IRadianteKDMMapData> {
 
     this._mapDataTableLen.value.set(this._mapDataTable.length);
     super._build(buffer);
-  }
-
-  protected override _validate(
-    state: unknown
-  ): null | RadianteKDMInvalidStateError {
-    return null;
   }
 }
 

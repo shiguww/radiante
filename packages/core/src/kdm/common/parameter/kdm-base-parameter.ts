@@ -1,12 +1,14 @@
+import z from "zod";
 import { CTRMemory } from "libctr";
+import type { ZodType } from "zod";
 import { RadianteKDMEntity } from "#kdm/common/kdm-entity";
 import { RadianteKDMI32 } from "#kdm/common/primitive/kdm-i32";
 import { RadianteKDMStringPointer } from "#kdm/common/primitive/kdm-string-pointer";
+
 import type {
   RadianteKDMBuildContext,
   RadianteKDMParseContext
 } from "#kdm/kdm";
-import { RadianteKDMInvalidStateError } from "#kdm/kdm-error";
 
 interface IRadianteKDMBaseParameter<T, N extends string> {
   value: T;
@@ -31,6 +33,14 @@ abstract class RadianteKDMBaseParameter<
     this.name = new RadianteKDMStringPointer();
   }
 
+  public override get schema(): ZodType<IRadianteKDMBaseParameter<T, N>> {
+    return <ZodType<IRadianteKDMBaseParameter<T, N>>>z.object({
+      name: this.name.schema,
+      value: this.value.schema,
+      _entity: z.literal(this._entity)
+    });
+  }
+
   protected override _get(): IRadianteKDMBaseParameter<T, N> {
     return {
       _entity: this._entity,
@@ -42,29 +52,6 @@ abstract class RadianteKDMBaseParameter<
   protected override _set(state: IRadianteKDMBaseParameter<T, N>): void {
     this.name.set(state.name);
     this.value.set(state.value);
-  }
-
-  protected override _validate(
-    input: unknown
-  ): null | RadianteKDMInvalidStateError {
-    if (input === null || typeof input !== "object") {
-      return new RadianteKDMInvalidStateError([], input, input);
-    }
-
-    let err: null | RadianteKDMInvalidStateError;
-    err = this.name._validateAt(input, Reflect.get(input, "name"), ["name"]);
-
-    if (err !== null) {
-      return err;
-    }
-
-    err = this.value._validateAt(input, Reflect.get(input, "value"), ["value"]);
-
-    if (err !== null) {
-      return err;
-    }
-
-    return null;
   }
 
   protected override _build(
