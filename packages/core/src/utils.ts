@@ -1,8 +1,25 @@
 import os from "node:os";
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
+import { CTRError } from "libctr";
 
 let tmpdir = os.tmpdir();
+
+export const assert: (
+  condition: unknown,
+  err: string | CTRError,
+  message?: string
+) => asserts condition = (
+  condition: unknown,
+  err: string | CTRError,
+  message?: string
+): asserts condition => {
+  if (!Boolean(condition)) {
+    throw typeof err === "string"
+      ? new CTRError(err, message || err, err)
+      : err;
+  }
+};
 
 export const setTemporaryDirectory = (dirpath: string): void =>
   void (tmpdir = resolve(dirpath));
