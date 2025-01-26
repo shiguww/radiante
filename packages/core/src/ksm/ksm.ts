@@ -1,5 +1,6 @@
+import { RadianteKSMVariable } from "#ksm/ksm-variable";
 import { CTRMemory, CTRBinarySerializable } from "libctr";
-import { RadianteKSMVariableDefinition } from "#ksm/ksm-variable-definition";
+import { RadianteKSMFunctionImport } from "./ksm-function-import";
 
 const RADIANTE_KSM_MAGIC = [
   0x4b, 0x53, 0x4d, 0x52, 0x00, 0x03, 0x01, 0x00
@@ -25,21 +26,21 @@ class RadianteKSM extends CTRBinarySerializable {
   public readonly section0: number[];
   public readonly section1: number[];
   public readonly section3: number[];
-  public readonly section5: number[];
   public readonly section7: number[];
-  public readonly globals: RadianteKSMVariableDefinition[];
-  public readonly statics: RadianteKSMVariableDefinition[];
-  public readonly constants: RadianteKSMVariableDefinition[];
+  public readonly globals: RadianteKSMVariable[];
+  public readonly statics: RadianteKSMVariable[];
+  public readonly constants: RadianteKSMVariable[];
+  public readonly imports: RadianteKSMFunctionImport[];
 
   public constructor() {
     super();
 
     this.globals = [];
+    this.imports = [];
     this.statics = [];
     this.section0 = [];
     this.section1 = [];
     this.section3 = [];
-    this.section5 = [];
     this.section7 = [];
     this.constants = [];
   }
@@ -56,7 +57,7 @@ class RadianteKSM extends CTRBinarySerializable {
     this._parseSection2(buffer);
     this._parseSection3(buffer, header);
     this._parseSection4(buffer);
-    this._parseSection5(buffer, header);
+    this._parseSection5(buffer);
     this._parseSection6(buffer);
     this._parseSection7(buffer);
   }
@@ -115,7 +116,7 @@ class RadianteKSM extends CTRBinarySerializable {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.statics.push(new RadianteKSMVariableDefinition().parse(buffer));
+      this.statics.push(new RadianteKSMVariable().parse(buffer));
     }
   }
 
@@ -129,13 +130,15 @@ class RadianteKSM extends CTRBinarySerializable {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.constants.push(new RadianteKSMVariableDefinition().parse(buffer));
+      this.constants.push(new RadianteKSMVariable().parse(buffer));
     }
   }
 
-  private _parseSection5(buffer: CTRMemory, header: RadianteKSMHeader): void {
-    while (buffer.offset < header.section6) {
-      this.section5.push(buffer.u32());
+  private _parseSection5(buffer: CTRMemory): void {
+    const count = buffer.u32();
+
+    for (let i = 0; i < count; i += 1) {
+      this.imports.push(new RadianteKSMFunctionImport().parse(buffer));
     }
   }
 
@@ -143,7 +146,7 @@ class RadianteKSM extends CTRBinarySerializable {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.globals.push(new RadianteKSMVariableDefinition().parse(buffer));
+      this.globals.push(new RadianteKSMVariable().parse(buffer));
     }
   }
 

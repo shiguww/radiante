@@ -3,7 +3,7 @@ import { CTRMemory, CTRBinarySerializable } from "libctr";
 
 type RadianteKSMVariableType = "f32" | "i32" | "string" | number;
 
-class RadianteKSMVariableDefinition extends CTRBinarySerializable {
+class RadianteKSMVariable extends CTRBinarySerializable {
   private static readonly VARIABLE_TYPE_F32 = 0;
   private static readonly VARIABLE_TYPE_I32 = 1;
   private static readonly VARIABLE_TYPE_STRING = 3;
@@ -64,11 +64,11 @@ class RadianteKSMVariableDefinition extends CTRBinarySerializable {
     const type = buffer.u24();
 
     switch (type) {
-      case RadianteKSMVariableDefinition.VARIABLE_TYPE_F32:
+      case RadianteKSMVariable.VARIABLE_TYPE_F32:
         return "f32";
-      case RadianteKSMVariableDefinition.VARIABLE_TYPE_I32:
+      case RadianteKSMVariable.VARIABLE_TYPE_I32:
         return "i32";
-      case RadianteKSMVariableDefinition.VARIABLE_TYPE_STRING:
+      case RadianteKSMVariable.VARIABLE_TYPE_STRING:
         return "string";
       default:
         return type;
@@ -77,6 +77,6 @@ class RadianteKSMVariableDefinition extends CTRBinarySerializable {
 }
 
 export {
-  RadianteKSMVariableDefinition,
-  RadianteKSMVariableDefinition as KSMVariableDefinition
+  RadianteKSMVariable,
+  RadianteKSMVariable as KSMVariable
 };
