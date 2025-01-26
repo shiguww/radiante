@@ -1,9 +1,11 @@
 import { assert } from "#utils";
-import { CTRMemory, CTRBinarySerializable } from "libctr";
+import { CTRMemory } from "libctr";
+import { RadianteKSMEntity } from "#ksm/ksm-entity";
+import { RadianteKSMContext } from "#ksm/ksm-context";
 
 type RadianteKSMVariableType = "f32" | "i32" | "string" | number;
 
-class RadianteKSMVariable extends CTRBinarySerializable {
+class RadianteKSMVariable extends RadianteKSMEntity {
   private static readonly VARIABLE_TYPE_F32 = 0;
   private static readonly VARIABLE_TYPE_I32 = 1;
   private static readonly VARIABLE_TYPE_STRING = 3;
@@ -28,7 +30,7 @@ class RadianteKSMVariable extends CTRBinarySerializable {
     throw new Error("Method not implemented.");
   }
 
-  protected _parse(buffer: CTRMemory): void {
+  protected _parse(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const unknown = buffer.i32();
     this.id = buffer.i32();
 

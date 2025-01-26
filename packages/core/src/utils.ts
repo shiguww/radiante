@@ -7,17 +7,15 @@ let tmpdir = os.tmpdir();
 
 export const assert: (
   condition: unknown,
-  err: string | CTRError,
+  err?: string | CTRError,
   message?: string
 ) => asserts condition = (
   condition: unknown,
-  err: string | CTRError,
+  err?: string | CTRError,
   message?: string
 ): asserts condition => {
   if (!Boolean(condition)) {
-    throw typeof err === "string"
-      ? new CTRError(err, message || err, err)
-      : err;
+    throw err instanceof Error ? err : new CTRError(err, message || err, err);
   }
 };
 

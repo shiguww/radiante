@@ -1,9 +1,11 @@
 import { assert } from "#utils";
-import { CTRBinarySerializable, CTRMemory } from "libctr";
-import { RadianteKSMVariable } from "./ksm-variable";
-import { RadianteKSMLabel } from "./ksm-label";
+import { CTRMemory } from "libctr";
+import { RadianteKSMLabel } from "#ksm/ksm-label";
+import { RadianteKSMEntity } from "#ksm/ksm-entity";
+import { RadianteKSMVariable } from "#ksm/ksm-variable";
+import { RadianteKSMContext } from "./ksm-context";
 
-class RadianteKSMFunctionDefinition extends CTRBinarySerializable {
+class RadianteKSMFunctionDefinition extends RadianteKSMEntity {
   public id: number;
   public public: boolean;
   public unknown0: number;
@@ -34,10 +36,10 @@ class RadianteKSMFunctionDefinition extends CTRBinarySerializable {
     throw new Error("Method not implemented.");
   }
 
-  protected _parse(buffer: CTRMemory): void {
+  protected _parse(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const unknown = buffer.u32();
-
     this.id = buffer.u32();
+
     this.public = Boolean(buffer.u32());
     this.unknown0 = buffer.u32();
     this.codeStart = buffer.u32();
@@ -57,7 +59,7 @@ class RadianteKSMFunctionDefinition extends CTRBinarySerializable {
     const variableCount = buffer.u32();
 
     for (let i = 0; i < variableCount; i += 1) {
-      const variable = new RadianteKSMVariable().parse(buffer);
+      const variable = new RadianteKSMVariable().parse(buffer, ctx);
 
       /*
       if (variable.name === null) {
@@ -75,7 +77,7 @@ class RadianteKSMFunctionDefinition extends CTRBinarySerializable {
     const labelCount = buffer.u32();
 
     for (let i = 0; i < labelCount; i += 1) {
-      this.labels.push(new RadianteKSMLabel().parse(buffer));
+      this.labels.push(new RadianteKSMLabel().parse(buffer, ctx));
     }
   }
 }

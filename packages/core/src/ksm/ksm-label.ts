@@ -1,7 +1,8 @@
 import { assert } from "#utils";
-import { CTRBinarySerializable, CTRMemory } from "libctr";
+import { CTRMemory } from "libctr";
+import { RadianteKSMEntity } from "#ksm/ksm-entity";
 
-class RadianteKSMLabel extends CTRBinarySerializable {
+class RadianteKSMLabel extends RadianteKSMEntity {
   public id: number;
   public label: number;
   public name: null | string;

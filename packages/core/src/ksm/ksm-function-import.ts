@@ -1,7 +1,8 @@
 import { assert } from "#utils";
-import { CTRBinarySerializable, CTRMemory } from "libctr";
+import { CTRMemory } from "libctr";
+import { RadianteKSMEntity } from "#ksm/ksm-entity";
 
-class RadianteKSMFunctionImport extends CTRBinarySerializable {
+class RadianteKSMFunctionImport extends RadianteKSMEntity {
   public id: number;
   public unknown0: number;
   public unknown1: number;
@@ -27,7 +28,6 @@ class RadianteKSMFunctionImport extends CTRBinarySerializable {
   }
 
   protected _parse(buffer: CTRMemory): void {
-    console.log(buffer.offset);
     const unknown = buffer.u32();
 
     this.unknown0 = buffer.u32();

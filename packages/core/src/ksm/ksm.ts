@@ -1,7 +1,11 @@
+import { RadianteKSMContext } from "#ksm/ksm-context";
 import { RadianteKSMVariable } from "#ksm/ksm-variable";
 import { CTRMemory, CTRBinarySerializable } from "libctr";
-import { RadianteKSMFunctionImport } from "./ksm-function-import";
-import { RadianteKSMFunctionDefinition } from "./ksm-function-definition";
+import { RadianteKSMFunctionImport } from "#ksm/ksm-function-import";
+import { RadianteKSMFunctionDefinition } from "#ksm/ksm-function-definition";
+import { RadianteKSMFunctionInstruction } from "#ksm/instructions/ksm-function-instruction";
+import { RadianteKSMUnknownFunctionInstruction } from "#ksm/instructions/ksm-unknown-function-instruction";
+import { RadianteKSMGetArgsInstruction } from "#ksm/instructions/ksm-get-args-instruction";
 
 const RADIANTE_KSM_MAGIC = [
   0x4b, 0x53, 0x4d, 0x52, 0x00, 0x03, 0x01, 0x00
@@ -21,6 +25,8 @@ interface RadianteKSMHeader {
 }
 
 class RadianteKSM extends CTRBinarySerializable {
+  private static readonly OP_GET_ARGS = 0x05;
+
   private static readonly SECTION_COUNT = 8;
   private static readonly MAGIC = new CTRMemory(RADIANTE_KSM_MAGIC);
 
@@ -31,7 +37,11 @@ class RadianteKSM extends CTRBinarySerializable {
   public readonly statics: RadianteKSMVariable[];
   public readonly constants: RadianteKSMVariable[];
   public readonly imports: RadianteKSMFunctionImport[];
-  public readonly definitions: RadianteKSMFunctionDefinition[];
+
+  public readonly functions: Map<
+    RadianteKSMFunctionDefinition,
+    RadianteKSMFunctionInstruction[]
+  >;
 
   public constructor() {
     super();
@@ -43,7 +53,20 @@ class RadianteKSM extends CTRBinarySerializable {
     this.section3 = [];
     this.section7 = [];
     this.constants = [];
-    this.definitions = [];
+    this.functions = new Map();
+  }
+
+  public parseInstruction(
+    buffer: CTRMemory,
+    ctx: RadianteKSMContext
+  ): RadianteKSMFunctionInstruction {
+    ctx.opcode = buffer.u32() & 0xfffffeff;
+
+    if (ctx.opcode === RadianteKSM.OP_GET_ARGS) {
+      return new RadianteKSMGetArgsInstruction().parse(buffer, ctx);
+    }
+
+    return new RadianteKSMUnknownFunctionInstruction().parse(buffer, ctx);
   }
 
   protected _build(buffer: CTRMemory): void {
@@ -51,16 +74,17 @@ class RadianteKSM extends CTRBinarySerializable {
   }
 
   protected _parse(buffer: CTRMemory): void {
+    const ctx = new RadianteKSMContext(this);
     const header = this._parseHeader(buffer);
 
     this._parseSection0(buffer, header);
-    this._parseSection1(buffer);
-    this._parseSection2(buffer);
+    this._parseSection1(buffer, ctx);
+    this._parseSection2(buffer, ctx);
     this._parseSection3(buffer, header);
-    this._parseSection4(buffer);
-    this._parseSection5(buffer);
-    this._parseSection6(buffer);
-    this._parseSection7(buffer);
+    this._parseSection4(buffer, ctx);
+    this._parseSection5(buffer, ctx);
+    this._parseSection6(buffer, ctx);
+    this._parseSection7(buffer, ctx);
   }
 
   private _parseHeader(buffer: CTRMemory): RadianteKSMHeader {
@@ -107,19 +131,25 @@ class RadianteKSM extends CTRBinarySerializable {
     }
   }
 
-  private _parseSection1(buffer: CTRMemory): void {
+  private _parseSection1(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.definitions.push(new RadianteKSMFunctionDefinition().parse(buffer));
+      const fn = new RadianteKSMFunctionDefinition().parse(buffer, ctx);
+
+      ctx.symbols.set(fn.id, fn);
+      this.functions.set(fn, []);
     }
   }
 
-  private _parseSection2(buffer: CTRMemory): void {
+  private _parseSection2(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.statics.push(new RadianteKSMVariable().parse(buffer));
+      const variable = new RadianteKSMVariable().parse(buffer, ctx);
+
+      ctx.symbols.set(variable.id, variable);
+      this.statics.push(variable);
     }
   }
 
@@ -129,33 +159,59 @@ class RadianteKSM extends CTRBinarySerializable {
     }
   }
 
-  private _parseSection4(buffer: CTRMemory): void {
+  private _parseSection4(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.constants.push(new RadianteKSMVariable().parse(buffer));
+      const variable = new RadianteKSMVariable().parse(buffer, ctx);
+
+      ctx.symbols.set(variable.id, variable);
+      this.constants.push(variable);
     }
   }
 
-  private _parseSection5(buffer: CTRMemory): void {
+  private _parseSection5(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.imports.push(new RadianteKSMFunctionImport().parse(buffer));
+      const fn = new RadianteKSMFunctionImport().parse(buffer, ctx);
+
+      ctx.symbols.set(fn.id, fn);
+      this.imports.push(fn);
     }
   }
 
-  private _parseSection6(buffer: CTRMemory): void {
+  private _parseSection6(buffer: CTRMemory, ctx: RadianteKSMContext): void {
     const count = buffer.u32();
 
     for (let i = 0; i < count; i += 1) {
-      this.globals.push(new RadianteKSMVariable().parse(buffer));
+      const variable = new RadianteKSMVariable().parse(buffer, ctx);
+
+      ctx.symbols.set(variable.id, variable);
+      this.globals.push(variable);
     }
   }
 
-  private _parseSection7(buffer: CTRMemory): void {
-    while (!buffer.ended) {
-      this.section7.push(buffer.u32());
+  private _parseSection7(buffer: CTRMemory, ctx: RadianteKSMContext): void {
+    const count = buffer.u32();
+    const start = buffer.offset;
+
+    for (const fn of this.functions.keys()) {
+      buffer.seek(start + fn.codeStart * CTRMemory.U32_SIZE);
+
+      const subarray = buffer.subarray(
+        start + fn.codeStart * CTRMemory.U32_SIZE,
+        start + fn.codeEnd * CTRMemory.U32_SIZE
+      );
+
+      const scope = ctx.scope(fn);
+      const instructions: RadianteKSMFunctionInstruction[] = [];
+
+      while (!subarray.ended) {
+        instructions.push(this.parseInstruction(buffer, scope));
+      }
+
+      this.functions.set(fn, instructions);
     }
   }
 }
