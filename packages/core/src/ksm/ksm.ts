@@ -1,6 +1,7 @@
 import { RadianteKSMVariable } from "#ksm/ksm-variable";
 import { CTRMemory, CTRBinarySerializable } from "libctr";
 import { RadianteKSMFunctionImport } from "./ksm-function-import";
+import { RadianteKSMFunctionDefinition } from "./ksm-function-definition";
 
 const RADIANTE_KSM_MAGIC = [
   0x4b, 0x53, 0x4d, 0x52, 0x00, 0x03, 0x01, 0x00
@@ -24,13 +25,13 @@ class RadianteKSM extends CTRBinarySerializable {
   private static readonly MAGIC = new CTRMemory(RADIANTE_KSM_MAGIC);
 
   public readonly section0: number[];
-  public readonly section1: number[];
   public readonly section3: number[];
   public readonly section7: number[];
   public readonly globals: RadianteKSMVariable[];
   public readonly statics: RadianteKSMVariable[];
   public readonly constants: RadianteKSMVariable[];
   public readonly imports: RadianteKSMFunctionImport[];
+  public readonly definitions: RadianteKSMFunctionDefinition[];
 
   public constructor() {
     super();
@@ -39,10 +40,10 @@ class RadianteKSM extends CTRBinarySerializable {
     this.imports = [];
     this.statics = [];
     this.section0 = [];
-    this.section1 = [];
     this.section3 = [];
     this.section7 = [];
     this.constants = [];
+    this.definitions = [];
   }
 
   protected _build(buffer: CTRMemory): void {
@@ -53,7 +54,7 @@ class RadianteKSM extends CTRBinarySerializable {
     const header = this._parseHeader(buffer);
 
     this._parseSection0(buffer, header);
-    this._parseSection1(buffer, header);
+    this._parseSection1(buffer);
     this._parseSection2(buffer);
     this._parseSection3(buffer, header);
     this._parseSection4(buffer);
@@ -106,9 +107,11 @@ class RadianteKSM extends CTRBinarySerializable {
     }
   }
 
-  private _parseSection1(buffer: CTRMemory, header: RadianteKSMHeader): void {
-    while (buffer.offset < header.section2) {
-      this.section1.push(buffer.u32());
+  private _parseSection1(buffer: CTRMemory): void {
+    const count = buffer.u32();
+
+    for (let i = 0; i < count; i += 1) {
+      this.definitions.push(new RadianteKSMFunctionDefinition().parse(buffer));
     }
   }
 
